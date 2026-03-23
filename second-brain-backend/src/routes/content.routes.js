@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {DeleteContentController, getContentAllController, saveContentController} from "../controllers/content.controller.js";
+import {DeleteContentController, getContentAllController, getSingleUserContentController, saveContentController} from "../controllers/content.controller.js";
 import { AuthMiddleware } from "../middlewares/auth.Middleware.js";
 
 const contentRouter = Router();
@@ -119,4 +119,30 @@ contentRouter.get('/get-all', AuthMiddleware, getContentAllController)
  *         description: Content not found
  */
 contentRouter.delete('/delete/:id', AuthMiddleware, DeleteContentController)
+
+/**   
+ * @swagger
+ * /api/content/get-single-user:
+ *   get:
+ *     summary: Get all saved content for the logged-in user
+ *     tags: [Content]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Content'
+ */
+contentRouter.get('/get-single-user', AuthMiddleware, getSingleUserContentController)
+
 export default contentRouter

@@ -83,3 +83,24 @@ export async function DeleteContentController(req, res, next) {
         })
     }
 }
+
+
+export async function getSingleUserContentController(req,res,next) {
+    try {
+        const id=req.user.id
+        const content=await contentModel.find({userId:id})
+        if(!content){
+            return res.status(404).json({message:"Content not found"})
+        }
+        return res.status(200).json({
+            success:true,
+            data:content
+        })
+    } catch (error) {
+        console.error("Get Single User Content Error:", error.message);
+        return res.status(500).json({
+            success:false,
+            error:error.message
+        })
+    }
+}
