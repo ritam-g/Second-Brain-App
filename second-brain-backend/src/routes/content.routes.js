@@ -1,8 +1,8 @@
 import { Router } from "express";
-import {getContentAllController, saveContentController} from "../controllers/content.controller.js";
+import {DeleteContentController, getContentAllController, saveContentController} from "../controllers/content.controller.js";
 
 const contentRouter = Router();
-//maek proper with comment 
+
 /**  
  * @swagger
  * /api/content/save:
@@ -46,5 +46,25 @@ contentRouter.post('/save', saveContentController)
  *         description: Internal server error
  */
 contentRouter.get('/get-all', getContentAllController)
-
+//make proper with comment 
+/**   
+ * @swagger
+ * /api/content/delete/{id}:
+ *   delete:
+ *     summary: Delete content by ID
+ *     tags: [Content]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the content to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Content deleted successfully
+ *       500:
+ *         description: Internal server error
+ */
+contentRouter.delete('/delete/:id', DeleteContentController)
 export default contentRouter

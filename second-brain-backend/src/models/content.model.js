@@ -13,6 +13,10 @@ const contentSchema = new mongoose.Schema({
     title: { type: String, required: true },
     url: { type: String, required: true },
     tags: { type: [String] },
+}
+,{
+    timestamps: true
+
 });
 
 const contentModel = mongoose.model("Content", contentSchema);

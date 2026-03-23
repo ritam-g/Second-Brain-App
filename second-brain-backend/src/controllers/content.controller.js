@@ -57,7 +57,7 @@ export async function saveContentController(req, res, next) {
 
 export async function getContentAllController(req, res, next) {
     try {
-        const contents = await contentModel.find()
+        const contents = await contentModel.find().sort({ createdAt: -1 })
         return res.status(200).json(contents)
     } catch (error) {
         log.error(error);
@@ -66,4 +66,19 @@ export async function getContentAllController(req, res, next) {
 
     }
 
+}
+
+export async function DeleteContentController(req, res, next) {
+    try {
+        const contentId = req.params.id
+        const deletedContent = await contentModel.findByIdAndDelete(contentId)
+        return res.status(200).json(
+            {
+                message: "Content deleted successfully", deletedContent
+            }
+        )
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ error: error.message })
+    }
 }
