@@ -12,7 +12,10 @@ const contentSchema = new mongoose.Schema({
     userId: { type: String },
     title: { type: String, required: true },
     url: { type: String, required: true },
-    tags: { type: [String] },
+    tags: { type: [String] ,required: true},
+    type: { type: String },
+    description: { type: String },
+    image: { type: String },
 }
 ,{
     timestamps: true

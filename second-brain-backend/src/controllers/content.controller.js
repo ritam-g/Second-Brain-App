@@ -1,4 +1,5 @@
 import contentModel from "../models/content.model.js"
+import { getMetadata } from "../services/metadata.service.js"
 //maek proper with comment 
 /** 
  * @swagger
@@ -11,7 +12,16 @@ import contentModel from "../models/content.model.js"
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Content'
+ *             type: object
+ *             required:
+ *               - url
+ *             properties:
+ *               url:
+ *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *     responses:
  *       201:
  *         description: Content saved successfully
@@ -22,19 +32,43 @@ import contentModel from "../models/content.model.js"
  *       500:
  *         description: Internal server error
  */
-export async function saveContentController(req, res, next) {
+export async function saveContentController(req, res) {
     try {
-        const { url, title } = req.body
-        const newContent = await contentModel.create({ url, title })
-        return res.status(201).json(newContent)
+        const { url, title } = req.body;
+
+        // ✅ 1. Validate input
+        if (!url) {
+            return res.status(400).json({ message: "URL is required" });
+        }
+
+        // ✅ 2. Fetch metadata
+        const meta = await getMetadata(url);
+
+        // ✅ 3. Create content
+        const content = await contentModel.create({
+            url,
+            title: title || meta.title || "No title",
+            description: meta.description || "",
+            image: meta.image || "",
+            type: meta.type || "article",
+            tags: meta.tags || [],
+        });
+
+        // ✅ 4. Send response
+        return res.status(201).json({
+            success: true,
+            data: content,
+        });
 
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({ error: error.message })
+        console.error("Save Content Error:", error.message);
 
+        return res.status(500).json({
+            success: false,
+            message: "Failed to save content",
+        });
     }
 }
-
 
 /**  
  * @swagger
