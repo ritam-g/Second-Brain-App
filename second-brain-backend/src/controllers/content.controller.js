@@ -1,36 +1,8 @@
 import contentModel from "../models/content.model.js"
 import { getMetadata } from "../services/metadata.service.js"
-//maek proper with comment 
+// Consolidated documentation in routes file
 /** 
- * @swagger
- * /api/content/save:
- *   post:
- *     summary: Save content
- *     tags: [Content]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - url
- *             properties:
- *               url:
- *                 type: string
- *               tags:
- *                 type: array
- *                 items:
- *                   type: string
- *     responses:
- *       201:
- *         description: Content saved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Content'
- *       500:
- *         description: Internal server error
+ * Controller to save new content (URL/Metadata)
  */
 export async function saveContentController(req, res) {
     try {
@@ -52,6 +24,7 @@ export async function saveContentController(req, res) {
             image: meta.image || "",
             type: meta.type || "article",
             tags: meta.tags || [],
+            userId: req.user.id,
         });
 
         // ✅ 4. Send response
@@ -70,49 +43,43 @@ export async function saveContentController(req, res) {
     }
 }
 
-/**  
- * @swagger
- * /api/content:
- *   get:
- *     summary: Get all content
- *     tags: [Content]
- *     responses:
- *       200:
- *         description: Success
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Content'
- *       500:
- *         description: Internal server error
+/**
+ * Controller to fetch all content for the authenticated user
  */
 
 export async function getContentAllController(req, res, next) {
     try {
-        const contents = await contentModel.find().sort({ createdAt: -1 })
-        return res.status(200).json(contents)
+        const contents = await contentModel.find({ userId: req.user.id }).sort({ createdAt: -1 })
+        return res.status(200).json({
+            success: true,
+            data: contents
+        })
     } catch (error) {
-        log.error(error);
+        console.error(error);
         return res.status(500).json({ error: error.message })
-
-
     }
-
 }
 
+/**
+ * Controller to delete specific content by ID
+ */
 export async function DeleteContentController(req, res, next) {
     try {
         const contentId = req.params.id
-        const deletedContent = await contentModel.findByIdAndDelete(contentId)
-        return res.status(200).json(
-            {
-                message: "Content deleted successfully", deletedContent
-            }
-        )
+        const deletedContent = await contentModel.findOneAndDelete({ _id: contentId, userId: req.user.id })
+        if (!deletedContent) {
+            return res.status(404).json({ message: "Content not found or not authorized" })
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Content deleted successfully",
+            data: deletedContent
+        })
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({ error: error.message })
+        console.error("Delete Content Error:", error.message);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message 
+        })
     }
 }

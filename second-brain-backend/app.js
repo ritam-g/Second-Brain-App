@@ -1,12 +1,20 @@
 import express from 'express'
+import cookieParser from 'cookie-parser'
+import cors from 'cors'
 import contentRouter from './src/routes/content.routes.js'
+import authRouter from './src/routes/auth.route.js'
 
 
 const app = express()
 
 // middleware
 app.use(express.json())
+app.use(cookieParser())
+app.use(cors())
 
+
+app.use('/api/content',contentRouter)
+app.use('/api/auth',authRouter)
 // Global error handler for JSON parsing errors (e.g. malformed JSON in request body)
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
@@ -17,8 +25,5 @@ app.use((err, req, res, next) => {
     }
     next();
 });
-
-app.use('/api/content',contentRouter)
-
 
 export default app
