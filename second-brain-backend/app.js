@@ -1,4 +1,5 @@
 import express from 'express'
+import contentRouter from './src/routes/content.routes.js'
 
 
 const app = express()
@@ -7,11 +8,7 @@ const app = express()
 app.use(express.json())
 
 
-app.get('/', (req, res) => {
-    console.log('hit route /');
-    
-    res.send('Hello World!')
-})
+app.use('/api/content',contentRouter)
 
 
 export default app
