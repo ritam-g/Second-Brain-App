@@ -7,11 +7,7 @@ export async function registerController(req, res, next) {
         if (!username || !password || !email) {
             return res.status(400).json({ message: "All fields are required" })
         }
-        // Basic validation
-        const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s\\.]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ message: "Invalid email format" })
-        }
+        
         if (password.length < 6) {
             return res.status(400).json({ message: "Password must be at least 6 characters" })
         }
@@ -54,7 +50,7 @@ export async function userLoginController(req, res, next) {
             return res.status(401).json({ message: "Invalid credentials" })
         }
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' })
-        res.cookie("jwtToken", token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' })
+        res.cookie("jwtToken", token, { httpOnly: true })
         
         return res.status(200).json({ 
             success: true,
