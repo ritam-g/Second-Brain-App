@@ -59,6 +59,41 @@ export async function userLoginController(req, res, next) {
                 user: { id: user._id, username: user.username, email: user.email },
                 
             } 
+        })
+    } catch (error) {
+        console.error("Login Error:", error.message);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message 
+        })
+    }
+}
+
+export async function checkAuthController(req, res, next) {
+    try {
+        return res.status(200).json({
+            success: true,
+            message: "User fetched successfully",
+            data: { 
+                user: req.user 
+            }
+        })
+    } catch (error) {
+        console.error("Check Auth Error:", error.message);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message 
+        })
+    }
+}
+
+export async function logoutController(req, res, next) {
+    try {
+        res.clearCookie("jwtToken", { httpOnly: true, sameSite: 'lax' });
+        return res.status(200).json({
+            success: true,
+            message: "Logged out successfully"
+        })
     } catch (error) {
         console.error("Logout Error:", error.message);
         return res.status(500).json({ 

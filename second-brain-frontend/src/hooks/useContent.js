@@ -1,3 +1,4 @@
+import { useState, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
 import { getContentApi, saveContentApi, deleteContentApi } from '../api/content.api';
@@ -61,4 +62,49 @@ export const useDeleteContent = () => {
   };
 
   return { deleteContent };
+};
+
+/**
+ * REASONING FOR `useFilteredContent`:
+ * 
+ * 1. CLEAN ARCHITECTURE: The original content fetched from the API stays isolated inside Redux (`items`). 
+ *    We do NOT put filtered data into Redux, because filtering is purely a UI concern.
+ * 2. PERFORMANCE (DEBOUNCE): We use a 300ms debounce on the `searchTerm`. Instead of re-evaluating 
+ *    the expensive `useMemo` filter loop on every single keystroke, it waits until the user 
+ *    pauses typing. This dramatically improves UX and frontend performance for large arrays.
+ * 3. NO API OVERHEAD: Filtering happens strictly on the frontend instead of re-fetching from the server.
+ */
+export const useFilteredContent = (content, searchTerm, selectedTag) => {
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  const filteredContent = useMemo(() => {
+    if (!content) return [];
+    
+    return content.filter((item) => {
+      const matchSearch = 
+        !debouncedSearch || 
+        item.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+        item.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
+        
+      const matchTag = 
+        !selectedTag || 
+        selectedTag === 'All' || 
+        item.type === selectedTag || 
+        (item.tags && item.tags.includes(selectedTag));
+        
+      return matchSearch && matchTag;
+    });
+  }, [content, debouncedSearch, selectedTag]);
+
+  return { filteredContent };
 };

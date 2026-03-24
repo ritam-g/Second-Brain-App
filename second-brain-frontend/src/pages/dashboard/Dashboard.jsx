@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { useGetContent, useSaveContent } from '../../hooks/useContent';
+import { useGetContent, useSaveContent, useFilteredContent } from '../../hooks/useContent';
 import ContentCard from '../../components/cards/ContentCard';
 import Navbar from '../../components/layout/Navbar';
 import EmptyState from '../../components/ui/EmptyState';
@@ -43,16 +43,12 @@ const Dashboard = () => {
     return Array.from(tags);
   }, [items]);
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const matchSearch = item.title?.toLowerCase().includes(searchInput.toLowerCase()) || 
-                          item.description?.toLowerCase().includes(searchInput.toLowerCase());
-      const matchTag = selectedTag === 'All' || 
-                       item.type === selectedTag || 
-                       (item.tags && item.tags.includes(selectedTag));
-      return matchSearch && matchTag;
-    });
-  }, [items, searchInput, selectedTag]);
+  // REASONING TO USE A HOOK:
+  // Instead of an inline `useMemo` cluttering the Dashboard or a Redux slice managing UI state,
+  // we abstract the filter logic into `useFilteredContent`. 
+  // It consumes `items` directly from Redux and handles debouncing/matching internally,
+  // returning `filteredItems` to be safely rendered below without mutating original state.
+  const { filteredContent: filteredItems } = useFilteredContent(items, searchInput, selectedTag);
 
   return (
     <div className="min-h-screen bg-slate-50 pt-16 font-sans">
@@ -107,7 +103,7 @@ const Dashboard = () => {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text"
-              placeholder="Search notes..."
+              placeholder="Search by title..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
