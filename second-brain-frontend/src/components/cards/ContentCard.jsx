@@ -66,7 +66,7 @@ const ContentCard = ({ content }) => {
             <button 
               onClick={handleDelete}
               className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
-              title="Delete token"
+              title="Delete content"
             >
               <Trash2 className="w-4 h-4" />
             </button>

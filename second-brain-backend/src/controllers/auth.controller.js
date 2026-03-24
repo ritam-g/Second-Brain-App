@@ -57,11 +57,10 @@ export async function userLoginController(req, res, next) {
             message: "Login successful", 
             data: { 
                 user: { id: user._id, username: user.username, email: user.email },
-                token 
+                
             } 
-        })
     } catch (error) {
-        console.error("Login Error:", error.message);
+        console.error("Logout Error:", error.message);
         return res.status(500).json({ 
             success: false,
             error: error.message 

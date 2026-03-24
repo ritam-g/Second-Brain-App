@@ -1,8 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// ARCHITECTURAL CHANGE & BENEFIT:
+// Moving away from `token` to strictly validating the presence of the `user` object.
+// 1. Security: We don't rely on or parse localStorage tokens.
+// 2. UX (User Experience): We introduce a `loading` state to check `/auth/me` on startup. 
+//    This prevents unauthenticated flashes/flickers across the UI before validation completes.
 const initialState = {
-  token: localStorage.getItem('token') || null,
   user: null,
+  loading: true, // initial state is loading since we need to securely check cookie validation
 };
 
 const authSlice = createSlice({
@@ -10,15 +15,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     loginSuccess: (state, action) => {
-      state.token = action.payload;
+      state.user = action.payload;
     },
     logout: (state) => {
-      state.token = null;
       state.user = null;
-      localStorage.removeItem('token');
     },
+    setAuthLoading: (state, action) => {
+      state.loading = action.payload;
+    }
   },
 });
 
-export const { loginSuccess, logout } = authSlice.actions;
+export const { loginSuccess, logout, setAuthLoading } = authSlice.actions;
 export default authSlice.reducer;

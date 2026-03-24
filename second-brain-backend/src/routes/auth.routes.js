@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import { registerController, userLoginController } from '../controllers/auth.controller.js'
+import { registerController, userLoginController, checkAuthController, logoutController } from '../controllers/auth.controller.js'
+import { AuthMiddleware } from '../middlewares/auth.Middleware.js'
 
 /**   
  * @swagger
@@ -73,5 +74,30 @@ authRouter.post('/register', registerController)
  */
 authRouter.post('/login', userLoginController)
 
+/**  
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Check authentication status
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Validation successful
+ *       401:
+ *         description: Unauthorized
+ */
+authRouter.get('/me', AuthMiddleware, checkAuthController)
+
+/**  
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ */
+authRouter.post('/logout', logoutController)
 
 export default authRouter

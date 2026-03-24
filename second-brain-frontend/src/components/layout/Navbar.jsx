@@ -1,14 +1,13 @@
 import React from 'react';
-import { useDispatch } from 'react-redux';
-import { logout } from '../../redux/slices/authSlice';
+import { useLogout } from '../../hooks/useAuth';
 import Button from '../ui/Button';
 import { BrainCircuit, LogOut } from 'lucide-react';
 
 const Navbar = () => {
-  const dispatch = useDispatch();
+  const { performLogout, loading } = useLogout();
 
   const handleLogout = () => {
-    dispatch(logout());
+    performLogout();
   };
 
   return (
