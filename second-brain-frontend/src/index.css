@@ -1,17 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --toastify-color-light: rgba(255, 255, 255, 0.94);
   --toastify-text-color-light: #0f172a;
   --toastify-toast-width: min(24rem, calc(100vw - 1.5rem));
   --toastify-font-family: inherit;
+  --app-text: #f5dfb8;
 }
 
 @layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-background text-slate-800 font-sans antialiased;
+    @apply font-sans antialiased;
+    background:
+      radial-gradient(circle at top, rgba(255, 186, 92, 0.14), transparent 28%),
+      radial-gradient(circle at 10% 10%, rgba(255, 196, 111, 0.08), transparent 24%),
+      linear-gradient(180deg, #17110e 0%, #120d0a 100%);
+    color: var(--app-text);
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 191, 64, 0.28) rgba(255, 255, 255, 0.02);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 191, 64, 0.2);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  ::selection {
+    background: rgba(248, 174, 29, 0.24);
+    color: #fff2d7;
   }
 }
 
@@ -47,4 +89,27 @@
 .app-toast-progress {
   height: 3px;
   background: linear-gradient(90deg, #0f766e 0%, #2563eb 55%, #7c3aed 100%);
+}
+
+.obsidian-scroll {
+  scrollbar-width: none;
+}
+
+.obsidian-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.obsidian-masonry-grid {
+  display: flex;
+  margin-left: -1.25rem;
+  width: auto;
+}
+
+.obsidian-masonry-grid_column {
+  padding-left: 1.25rem;
+  background-clip: padding-box;
+}
+
+.obsidian-masonry-grid_column > div {
+  margin-bottom: 1.25rem;
 }

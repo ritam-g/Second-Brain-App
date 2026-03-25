@@ -126,15 +126,18 @@ export const useUploadContent = () => {
 
 /**
  * REASONING FOR `useFilteredContent`:
- * 
- * 1. CLEAN ARCHITECTURE: The original content fetched from the API stays isolated inside Redux (`items`). 
+ *
+ * 1. CLEAN ARCHITECTURE: The original content fetched from the API stays isolated inside Redux (`items`).
  *    We do NOT put filtered data into Redux, because filtering is purely a UI concern.
- * 2. PERFORMANCE (DEBOUNCE): We use a 300ms debounce on the `searchTerm`. Instead of re-evaluating 
- *    the expensive `useMemo` filter loop on every single keystroke, it waits until the user 
+ * 2. PERFORMANCE (DEBOUNCE): We use a 300ms debounce on the `searchTerm`. Instead of re-evaluating
+ *    the expensive `useMemo` filter loop on every single keystroke, it waits until the user
  *    pauses typing. This dramatically improves UX and frontend performance for large arrays.
  * 3. NO API OVERHEAD: Filtering happens strictly on the frontend instead of re-fetching from the server.
+ * 4. MULTI-FILTER SUPPORT: The dashboard needs search, category, and tag filtering together, so the
+ *    hook accepts a structured filter object and keeps the combinational logic out of the page component.
  */
-export const useFilteredContent = (content, searchTerm, selectedTag) => {
+export const useFilteredContent = (content, filters = {}) => {
+  const { searchTerm = '', selectedTag = 'All', selectedCategory = 'All' } = filters;
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
 
   useEffect(() => {
@@ -149,22 +152,52 @@ export const useFilteredContent = (content, searchTerm, selectedTag) => {
 
   const filteredContent = useMemo(() => {
     if (!content) return [];
-    
+
     return content.filter((item) => {
-      const matchSearch = 
-        !debouncedSearch || 
-        item.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
-        item.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
-        
-      const matchTag = 
-        !selectedTag || 
-        selectedTag === 'All' || 
-        item.type === selectedTag || 
-        (item.tags && item.tags.includes(selectedTag));
-        
-      return matchSearch && matchTag;
+      const normalizedSearch = debouncedSearch.trim().toLowerCase();
+      const normalizedTitle = String(item.title || '').toLowerCase();
+      const normalizedTag = String(selectedTag || 'All');
+      const normalizedCategory = String(selectedCategory || 'All');
+
+      const matchSearch =
+        !normalizedSearch
+        || normalizedTitle.includes(normalizedSearch);
+
+      const matchTag =
+        !normalizedTag
+        || normalizedTag === 'All'
+        || item.type === normalizedTag
+        || (item.tags && item.tags.includes(normalizedTag));
+
+      const matchCategory =
+        !normalizedCategory
+        || normalizedCategory === 'All'
+        || resolveDashboardCategory(item) === normalizedCategory;
+
+      return matchSearch && matchTag && matchCategory;
     });
-  }, [content, debouncedSearch, selectedTag]);
+  }, [content, debouncedSearch, selectedTag, selectedCategory]);
 
   return { filteredContent };
 };
+
+function resolveDashboardCategory(item) {
+  const normalizedType = String(item?.type || '').toLowerCase();
+  const normalizedUrl = String(item?.url || '').toLowerCase();
+
+  if (normalizedType === 'youtube' || normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be')) {
+    return 'Video';
+  }
+
+  if (
+    ['tweet', 'x', 'linkedin', 'instagram'].includes(normalizedType)
+    || normalizedUrl.includes('twitter.com')
+    || normalizedUrl.includes('x.com')
+    || normalizedUrl.includes('linkedin.com')
+    || normalizedUrl.includes('instagram.com')
+  ) {
+    return 'Social';
+  }
+
+  return 'Links';
+}
