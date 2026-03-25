@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import TagBadge from '../ui/TagBadge';
-import { ExternalLink, Bookmark, Trash2 } from 'lucide-react';
+import { ExternalLink, ImageOff, Trash2 } from 'lucide-react';
 import { useDeleteContent } from '../../hooks/useContent';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const ContentCard = ({ content }) => {
   const { _id, title, description, image, url, tags, type, siteName, createdAt } = content;
@@ -10,10 +12,12 @@ const ContentCard = ({ content }) => {
   const platformLabel = getPlatformLabel(url, type, siteName);
   const displayTitle = getDisplayTitle(url, title, description);
   const displayTags = getDisplayTags(tags);
+  const previewLabel = getPreviewLabel(platformLabel, type);
+  const previewImage = getPreviewImageUrl(image, url);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [image]);
+  }, [previewImage]);
 
   const handleDelete = async (e) => {
     e.preventDefault();
@@ -22,26 +26,40 @@ const ContentCard = ({ content }) => {
     }
   };
 
-  const showImage = Boolean(image) && !imageFailed;
-  console.log(image);
-  console.log(showImage);
-
+  const showImage = Boolean(previewImage) && !imageFailed;
 
   return (
     <div className="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:-translate-y-1">
       {/* Image section */}
-
-      (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
-        <img
-          src={image}
-          alt={displayTitle}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          referrerPolicy="no-referrer"
-          onError={() => setImageFailed(true)}
-        />
-      </a>
-      )
+      {showImage ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
+          <img
+            src={previewImage}
+            alt={displayTitle}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
+        </a>
+      ) : (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="aspect-video w-full relative block overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.7),_transparent_45%)]" />
+          <div className="absolute inset-x-0 bottom-0 p-5">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm">
+              <ImageOff className="w-3.5 h-3.5" />
+              {previewLabel}
+            </span>
+            <p className="mt-3 max-w-[16rem] text-sm font-medium text-slate-700 line-clamp-2">
+              Preview unavailable for this link.
+            </p>
+          </div>
+        </a>
+      )}
 
 
       {/* Content section */}
@@ -152,6 +170,39 @@ function getDisplayTags(tags) {
     .filter(tag => tag.length > 1 && !isStatusId(tag));
 
   return Array.from(new Set(normalizedTags)).slice(0, 6);
+}
+
+function getPreviewLabel(platformLabel, type) {
+  const label = String(platformLabel || type || 'web').trim();
+  return label || 'web';
+}
+
+function getPreviewImageUrl(imageUrl, sourceUrl) {
+  const normalizedImageUrl = String(imageUrl || '').trim();
+
+  if (!normalizedImageUrl) {
+    return '';
+  }
+
+  if (normalizedImageUrl.includes('/content/image-proxy?')) {
+    return normalizedImageUrl;
+  }
+
+  if (!/^https?:\/\//i.test(normalizedImageUrl)) {
+    return normalizedImageUrl;
+  }
+
+  // Route third-party previews through the backend because sites like LinkedIn often block direct <img> embedding.
+  const normalizedApiUrl = API_URL.replace(/\/+$/, '');
+  const params = new URLSearchParams({
+    url: normalizedImageUrl,
+  });
+
+  if (sourceUrl) {
+    params.set('source', sourceUrl);
+  }
+
+  return `${normalizedApiUrl}/content/image-proxy?${params.toString()}`;
 }
 
 function extractTwitterUsername(url) {

@@ -114,6 +114,8 @@ const Dashboard = () => {
         </div>
 
         {/* Content Grid */}
+        {console.log(items.image)
+        }
         {error && !items.length && (
           <div className="text-red-500 bg-red-50 p-4 rounded-xl text-center font-medium my-4 border border-red-100">
             {typeof error === 'string' ? error : 'Something went wrong.'}

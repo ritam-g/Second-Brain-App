@@ -1,8 +1,11 @@
 import { Router } from "express";
-import {DeleteContentController, getContentAllController, getSingleUserContentController, saveContentController} from "../controllers/content.controller.js";
+import {DeleteContentController, getContentAllController, getSingleUserContentController, proxyContentImageController, saveContentController} from "../controllers/content.controller.js";
 import { AuthMiddleware } from "../middlewares/auth.Middleware.js";
 
 const contentRouter = Router();
+
+// Public on purpose: card previews load as plain image requests, not authenticated XHR/fetch calls.
+contentRouter.get('/image-proxy', proxyContentImageController)
 
 /**   
  * @swagger
