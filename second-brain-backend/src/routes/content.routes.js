@@ -1,11 +1,19 @@
-import { Router } from "express";
-import {DeleteContentController, getContentAllController, getSingleUserContentController, proxyContentImageController, saveContentController} from "../controllers/content.controller.js";
-import { AuthMiddleware } from "../middlewares/auth.Middleware.js";
+import { Router } from "express"
+import {
+    DeleteContentController,
+    getContentAllController,
+    getSingleUserContentController,
+    proxyContentImageController,
+    saveContentController,
+    uploadContentController,
+} from "../controllers/content.controller.js"
+import { AuthMiddleware } from "../middlewares/auth.Middleware.js"
+import { upload } from "../middlewares/upload.middleware.js"
 
-const contentRouter = Router();
+const contentRouter = Router()
 
 // Public on purpose: card previews load as plain image requests, not authenticated XHR/fetch calls.
-contentRouter.get('/image-proxy', proxyContentImageController)
+contentRouter.get("/image-proxy", proxyContentImageController)
 
 /**   
  * @swagger
@@ -73,7 +81,39 @@ contentRouter.get('/image-proxy', proxyContentImageController)
  *       500:
  *         description: Internal server error
  */
-contentRouter.post('/save', AuthMiddleware, saveContentController)
+contentRouter.post("/save", AuthMiddleware, saveContentController)
+
+/**  
+ * @swagger
+ * /api/content/upload:
+ *   post:
+ *     summary: Upload a PDF or image and save it with AI-generated tags
+ *     tags: [Content]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *               title:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Uploaded content saved successfully
+ *       400:
+ *         description: Invalid upload request
+ *       500:
+ *         description: Internal server error
+ */
+contentRouter.post("/upload", AuthMiddleware, upload.single("file"), uploadContentController)
 
 /**   
  * @swagger
@@ -98,7 +138,7 @@ contentRouter.post('/save', AuthMiddleware, saveContentController)
  *                   items:
  *                     $ref: '#/components/schemas/Content'
  */
-contentRouter.get('/get-all', AuthMiddleware, getContentAllController)
+contentRouter.get("/get-all", AuthMiddleware, getContentAllController)
 
 /**   
  * @swagger
@@ -121,7 +161,7 @@ contentRouter.get('/get-all', AuthMiddleware, getContentAllController)
  *       404:
  *         description: Content not found
  */
-contentRouter.delete('/delete/:id', AuthMiddleware, DeleteContentController)
+contentRouter.delete("/delete/:id", AuthMiddleware, DeleteContentController)
 
 /**   
  * @swagger
@@ -146,6 +186,6 @@ contentRouter.delete('/delete/:id', AuthMiddleware, DeleteContentController)
  *                   items:
  *                     $ref: '#/components/schemas/Content'
  */
-contentRouter.get('/get-single-user', AuthMiddleware, getSingleUserContentController)
+contentRouter.get("/get-single-user", AuthMiddleware, getSingleUserContentController)
 
 export default contentRouter

@@ -20,6 +20,13 @@ app.use('/api/content',contentRouter)
 app.use('/api/auth',authRouter)
 // Global error handler for JSON parsing errors (e.g. malformed JSON in request body)
 app.use((err, req, res, next) => {
+    if (err?.name === 'MulterError') {
+        return res.status(400).json({
+            success: false,
+            message: err.message
+        })
+    }
+
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         return res.status(400).json({ 
             success: false, 

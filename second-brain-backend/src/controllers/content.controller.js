@@ -1,22 +1,21 @@
 import contentModel from "../models/content.model.js"
+import { generateTagsFromText } from "../services/ai.service.js"
+import { detectUploadFileType, extractText } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
-// Consolidated documentation in routes file
-/** 
- * Controller to save new content (URL/Metadata)
- */
+import { uploadFileToImageKit } from "../services/upload.service.js"
+
+// Saves URL-based content by scraping metadata from the target page.
+// Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
+// Output: JSON response containing the created content document.
 export async function saveContentController(req, res) {
     try {
-        const { url, title } = req.body;
+        const { url, title } = req.body
 
-        // ✅ 1. Validate input
         if (!url) {
-            return res.status(400).json({ message: "URL is required" });
+            return res.status(400).json({ message: "URL is required" })
         }
 
-        // ✅ 2. Fetch metadata
-        const meta = await getMetadata(url);
-
-        // ✅ 3. Create content
+        const meta = await getMetadata(url)
         const content = await contentModel.create({
             url,
             title: title || meta.title || "No title",
@@ -25,28 +24,87 @@ export async function saveContentController(req, res) {
             type: meta.type || "article",
             tags: meta.tags || [],
             userId: req.user.id,
-        });
+        })
 
-        // ✅ 4. Send response
         return res.status(201).json({
             success: true,
             data: content,
-        });
-
+        })
     } catch (error) {
-        console.error("Save Content Error:", error.message);
+        console.error("Save Content Error:", error.message)
 
         return res.status(500).json({
             success: false,
             message: "Failed to save content",
-        });
+        })
     }
 }
 
-/**
- * Controller to fetch all content for the authenticated user
- */
+// Uploads a PDF or image, extracts text, generates AI tags, and stores the result as saved content.
+// Input: Express request with `req.file` from multer, optional `req.body.title`, and authenticated `req.user.id`.
+// Output: JSON response containing the created content document.
+export async function uploadContentController(req, res) {
+    try {
+        const file = req.file
 
+        if (!file) {
+            return res.status(400).json({ message: "File is required" })
+        }
+
+        const uploadType = detectUploadFileType(file)
+
+        if (!uploadType) {
+            return res.status(400).json({ message: "Only PDF or image files are supported" })
+        }
+
+        const extractedText = await extractText(file)
+        const uploadedFile = await uploadFileToImageKit(file, {
+            userId: req.user.id,
+            uploadType,
+        })
+
+        if (!uploadedFile?.url) {
+            throw new Error("ImageKit did not return a public file URL")
+        }
+
+        const aiTags = await generateTagsFromText(
+            buildAiInputText(extractedText, file.originalname, uploadType),
+            {
+                fileName: file.originalname,
+                fileType: uploadType,
+            },
+        )
+
+        const content = await contentModel.create({
+            userId: req.user.id,
+            title: resolveUploadedTitle(req.body?.title, extractedText, file.originalname),
+            description: buildUploadedDescription(extractedText, uploadType),
+            image: uploadType === "image" ? uploadedFile.url : uploadedFile.thumbnailUrl || "",
+            tags: buildSavedTags(aiTags, uploadType, file.originalname),
+            type: uploadType === "image" ? "image" : "document",
+            url: uploadedFile.url,
+        })
+
+        return res.status(201).json({
+            success: true,
+            data: content,
+        })
+    } catch (error) {
+        console.error("Upload Content Error:", error.message)
+
+        const statusCode = resolveUploadErrorStatus(error)
+        const message = resolveUploadErrorMessage(error)
+
+        return res.status(statusCode).json({
+            success: false,
+            message,
+        })
+    }
+}
+
+// Fetches all saved content for the authenticated user.
+// Input: Express request with authenticated `req.user.id`.
+// Output: JSON response containing an array of content documents.
 export async function getContentAllController(req, res, next) {
     try {
         const contents = await contentModel.find({ userId: req.user.id }).sort({ createdAt: -1 })
@@ -55,14 +113,14 @@ export async function getContentAllController(req, res, next) {
             data: contents
         })
     } catch (error) {
-        console.error(error);
+        console.error(error)
         return res.status(500).json({ error: error.message })
     }
 }
 
-/**
- * Controller to delete specific content by ID
- */
+// Deletes one content record owned by the authenticated user.
+// Input: Express request with `req.params.id` and authenticated `req.user.id`.
+// Output: JSON response containing the deleted document when successful.
 export async function DeleteContentController(req, res, next) {
     try {
         const contentId = req.params.id
@@ -76,75 +134,75 @@ export async function DeleteContentController(req, res, next) {
             data: deletedContent
         })
     } catch (error) {
-        console.error("Delete Content Error:", error.message);
-        return res.status(500).json({ 
+        console.error("Delete Content Error:", error.message)
+        return res.status(500).json({
             success: false,
-            error: error.message 
+            error: error.message
         })
     }
 }
 
-
-export async function getSingleUserContentController(req,res,next) {
+// Fetches the current user's saved content without applying extra filters.
+// Input: Express request with authenticated `req.user.id`.
+// Output: JSON response containing an array of saved content documents.
+export async function getSingleUserContentController(req, res, next) {
     try {
-        const id=req.user.id
-        const content=await contentModel.find({userId:id})
-        if(!content){
-            return res.status(404).json({message:"Content not found"})
-        }
+        const id = req.user.id
+        const content = await contentModel.find({ userId: id }).sort({ createdAt: -1 })
         return res.status(200).json({
-            success:true,
-            data:content
+            success: true,
+            data: content
         })
     } catch (error) {
-        console.error("Get Single User Content Error:", error.message);
+        console.error("Get Single User Content Error:", error.message)
         return res.status(500).json({
-            success:false,
-            error:error.message
+            success: false,
+            error: error.message
         })
     }
 }
 
+// Proxies third-party preview images through the backend so blocked hotlinks still render on the frontend.
+// Input: Express request with `req.query.url` and optional `req.query.source`.
+// Output: proxied image bytes or a JSON error response.
 export async function proxyContentImageController(req, res) {
     try {
-        const imageUrl = String(req.query.url || "").trim();
-        const sourceUrl = String(req.query.source || "").trim();
+        const imageUrl = String(req.query.url || "").trim()
+        const sourceUrl = String(req.query.source || "").trim()
 
         if (!imageUrl) {
             return res.status(400).json({
                 success: false,
                 message: "Image URL is required",
-            });
+            })
         }
 
-        let parsedImageUrl;
+        let parsedImageUrl
 
         try {
-            parsedImageUrl = new URL(imageUrl);
+            parsedImageUrl = new URL(imageUrl)
         } catch {
             return res.status(400).json({
                 success: false,
                 message: "Invalid image URL",
-            });
+            })
         }
 
         if (!["http:", "https:"].includes(parsedImageUrl.protocol)) {
             return res.status(400).json({
                 success: false,
                 message: "Only HTTP(S) image URLs are supported",
-            });
+            })
         }
 
         if (isBlockedProxyHost(parsedImageUrl.hostname)) {
             return res.status(400).json({
                 success: false,
                 message: "Unsupported image host",
-            });
+            })
         }
 
-        // Some providers allow opening the image URL directly but block hotlinking from browser <img> tags.
-        // Fetching server-side with a matching referer/user-agent makes those previews render reliably in the app.
-        const referer = getSafeReferer(sourceUrl, parsedImageUrl);
+        const referer = getSafeReferer(sourceUrl, parsedImageUrl)
         const response = await fetch(parsedImageUrl, {
             headers: {
                 "accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -153,84 +211,233 @@ export async function proxyContentImageController(req, res) {
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
             },
             redirect: "follow",
-        });
+        })
 
         if (!response.ok) {
             return res.status(502).json({
                 success: false,
                 message: "Failed to fetch image preview",
-            });
+            })
         }
 
-        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase()
 
         if (!contentType.startsWith("image/")) {
             return res.status(415).json({
                 success: false,
                 message: "Preview URL did not return an image",
-            });
+            })
         }
 
-        const cacheControl = response.headers.get("cache-control");
-        const contentLength = response.headers.get("content-length");
-        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        const cacheControl = response.headers.get("cache-control")
+        const contentLength = response.headers.get("content-length")
+        const imageBuffer = Buffer.from(await response.arrayBuffer())
 
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Cache-Control", cacheControl || "public, max-age=86400");
+        res.setHeader("Content-Type", contentType)
+        res.setHeader("Cache-Control", cacheControl || "public, max-age=86400")
 
         if (contentLength) {
-            res.setHeader("Content-Length", contentLength);
+            res.setHeader("Content-Length", contentLength)
         }
 
-        return res.status(200).send(imageBuffer);
+        return res.status(200).send(imageBuffer)
     } catch (error) {
-        console.error("Image Proxy Error:", error.message);
+        console.error("Image Proxy Error:", error.message)
         return res.status(502).json({
             success: false,
             message: "Failed to load image preview",
-        });
+        })
     }
 }
 
+// Builds the text sent into the AI model, even when OCR/PDF extraction is sparse.
+// Input: extracted text string, original filename, and detected upload type.
+// Output: prompt-ready text string.
+function buildAiInputText(extractedText, originalName, uploadType) {
+    const normalizedText = String(extractedText || "").trim()
+
+    if (normalizedText) {
+        return normalizedText
+    }
+
+    return `File name: ${stripFileExtension(originalName)}\nFile type: ${uploadType}\nUploaded file for Second Brain knowledge storage.`
+}
+
+// Resolves a stable title for uploaded content.
+// Input: optional manual title, extracted text, and original filename.
+// Output: string title suitable for saving in MongoDB.
+function resolveUploadedTitle(manualTitle, extractedText, originalName) {
+    const cleanedManualTitle = normalizeSingleLine(manualTitle)
+    if (cleanedManualTitle) {
+        return cleanedManualTitle
+    }
+
+    const extractedTitle = String(extractedText || "")
+        .split("\n")
+        .map(line => normalizeSingleLine(line))
+        .find(Boolean)
+
+    if (extractedTitle) {
+        return extractedTitle.slice(0, 120)
+    }
+
+    return normalizeSingleLine(stripFileExtension(originalName)) || "Uploaded File"
+}
+
+// Builds the short content description stored alongside the uploaded file.
+// Input: extracted text string and detected upload type.
+// Output: short description string capped for card previews.
+function buildUploadedDescription(extractedText, uploadType) {
+    const normalizedText = String(extractedText || "").trim()
+
+    if (normalizedText) {
+        return normalizedText.slice(0, 200)
+    }
+
+    return uploadType === "image"
+        ? "Image upload saved to Second Brain."
+        : "Document upload saved to Second Brain."
+}
+
+// Merges AI tags with file-derived tags so saved uploads stay searchable even when the model is sparse.
+// Input: AI-generated tag array, detected upload type, and original filename.
+// Output: deduplicated array of tags ready for MongoDB.
+function buildSavedTags(aiTags, uploadType, originalName) {
+    const fileNameTags = stripFileExtension(originalName)
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(tag => tag.length > 2)
+
+    const tags = [
+        ...aiTags,
+        uploadType,
+        "upload",
+        ...fileNameTags,
+    ]
+
+    return [...new Set(tags.map(normalizeTag).filter(Boolean))].slice(0, 10)
+}
+
+// Normalizes user-facing titles and filenames onto a single line.
+// Input: raw string value.
+// Output: compact single-line string.
+function normalizeSingleLine(value) {
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+}
+
+// Removes the file extension so uploaded file names can become readable titles and tags.
+// Input: original filename string.
+// Output: filename without the last extension segment.
+function stripFileExtension(fileName) {
+    const normalizedFileName = String(fileName || "").trim()
+    return normalizedFileName.replace(/\.[^.]+$/, "")
+}
+
+// Sanitizes tags before they are stored in MongoDB.
+// Input: raw tag string.
+// Output: lowercase tag or an empty string.
+function normalizeTag(tag) {
+    return String(tag || "")
+        .toLowerCase()
+        .trim()
+        .replace(/^#+/, "")
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+}
+
+// Resolves a safe referer header for the image proxy fetch request.
+// Input: original source page URL and parsed image URL.
+// Output: referer string used in the outbound fetch.
 function getSafeReferer(sourceUrl, parsedImageUrl) {
     try {
         if (sourceUrl) {
-            const parsedSourceUrl = new URL(sourceUrl);
+            const parsedSourceUrl = new URL(sourceUrl)
 
             if (["http:", "https:"].includes(parsedSourceUrl.protocol)) {
-                return parsedSourceUrl.origin + "/";
+                return parsedSourceUrl.origin + "/"
             }
         }
     } catch {
         // Ignore malformed source URLs and fall back to the image host origin.
     }
 
-    return parsedImageUrl.origin + "/";
+    return parsedImageUrl.origin + "/"
 }
 
+// Prevents the proxy endpoint from being used against localhost or private-network destinations.
+// Input: hostname string from the requested image URL.
+// Output: boolean indicating whether the host should be blocked.
 function isBlockedProxyHost(hostname) {
-    const normalizedHost = String(hostname || "").toLowerCase();
+    const normalizedHost = String(hostname || "").toLowerCase()
 
     if (!normalizedHost) {
-        return true;
+        return true
     }
 
-    // Prevent the proxy from being used against local/private network addresses.
     if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(normalizedHost)) {
-        return true;
+        return true
     }
 
     if (/^10\.\d+\.\d+\.\d+$/.test(normalizedHost)) {
-        return true;
+        return true
     }
 
     if (/^192\.168\.\d+\.\d+$/.test(normalizedHost)) {
-        return true;
+        return true
     }
 
     if (/^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(normalizedHost)) {
-        return true;
+        return true
     }
 
-    return false;
+    return false
+}
+
+// Maps known upload failures to a response status that matches the root cause.
+// Input: thrown error from upload/extract/AI services.
+// Output: HTTP status code for the API response.
+function resolveUploadErrorStatus(error) {
+    const message = String(error?.message || "")
+
+    if (
+        message.includes("Only PDF or image files are supported") ||
+        message.includes("File is required") ||
+        message.includes("Unsupported file type")
+    ) {
+        return 400
+    }
+
+    if (
+        message.includes("IMAGEKIT_PRIVATE_KEY") ||
+        message.includes("ImageKit public key") ||
+        message.includes("Your account cannot be authenticated")
+    ) {
+        return 500
+    }
+
+    return 500
+}
+
+// Converts low-level upload errors into readable API messages for the frontend or API client.
+// Input: thrown error from upload/extract/AI services.
+// Output: safe response message string.
+function resolveUploadErrorMessage(error) {
+    const message = String(error?.message || "")
+
+    if (message.includes("IMAGEKIT_PRIVATE_KEY")) {
+        return message
+    }
+
+    if (message.includes("Your account cannot be authenticated")) {
+        return "ImageKit authentication failed. Check that IMAGEKIT_PRIVATE_KEY contains your ImageKit private key, not the public key."
+    }
+
+    if (message.includes("MISTRAL_API_KEY")) {
+        return "Mistral API key is missing or invalid."
+    }
+
+    return "Failed to upload content"
 }
