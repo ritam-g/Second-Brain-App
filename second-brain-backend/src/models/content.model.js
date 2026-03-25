@@ -13,7 +13,10 @@ const contentSchema = new mongoose.Schema({
     title: { type: String, required: true },
     url: { type: String, required: true },
     tags: { type: [String], required: true },
-    type: { type: String },
+    type: { type: String,
+        enum: ["article", "youtube", "tweet", "pdf","linkedin","instagram","github","x"],
+        default: "article"
+    },
     description: { type: String },
     image: { type: String },
 }
