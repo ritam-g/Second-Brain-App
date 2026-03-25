@@ -1,10 +1,18 @@
 import ogs from "open-graph-scraper";
 import { cleanTitle } from "../utils/CleanTitle.js";
 
+const maxMetadataTitleCharacters = 80;
+const maxMetadataDescriptionCharacters = 180;
+
 export async function getMetadata(url) {
     try {
-        const { error, result } = await ogs({ url });
         const platform = detectPlatform(url);
+
+        if (platform === "youtube") {
+            return await getYouTubeMetadata(url);
+        }
+
+        const { error, result } = await ogs({ url });
 
         if (error || !result) {
             return fallback(url, platform);
@@ -43,14 +51,13 @@ export async function getMetadata(url) {
 
         tags.push(platform);
         tags = [...new Set(tags)];
-        console.log(result);
-        
+
         return {
             title,
             description,
             image,
             siteName: result.ogSiteName || platform,
-            type: mapType(url, result.requestUrl),
+            type: mapType(url, result.ogType),
             url: result.ogUrl || url,
             tags,
         };
@@ -58,6 +65,34 @@ export async function getMetadata(url) {
         console.error("Metadata Error:", err.message);
         return fallback(url, detectPlatform(url));
     }
+}
+
+// Resolves YouTube metadata from YouTube's own oEmbed endpoint so saved videos keep the real title and thumbnail.
+// Input: original YouTube URL from the save form.
+// Output: metadata object shaped like the generic scraper response.
+async function getYouTubeMetadata(url) {
+    const oEmbedMetadata = await fetchYouTubeOEmbed(url);
+    const videoId = extractYouTubeId(url);
+    const title = normalizeTitle(oEmbedMetadata?.title) || "YouTube Video";
+    const image = normalizeUrl(oEmbedMetadata?.thumbnail_url, url)
+        || buildYouTubeThumbnail(videoId)
+        || platformFallbackImage("youtube");
+    const authorName = normalizeTitle(oEmbedMetadata?.author_name);
+    const tags = [
+        ...generateTagsFromTitle(title),
+        ...generateTagsFromTitle(authorName),
+        "youtube",
+    ];
+
+    return {
+        title,
+        description: "",
+        image,
+        siteName: "youtube",
+        type: "youtube",
+        url,
+        tags: [...new Set(tags.filter(Boolean))],
+    };
 }
 
 function mapType(url, ogType) {
@@ -131,6 +166,26 @@ function detectPlatform(url) {
     return "web";
 }
 
+// Fetches YouTube oEmbed metadata for a public video, short, or youtu.be link.
+// Input: original YouTube URL.
+// Output: parsed oEmbed JSON object or null when unavailable.
+async function fetchYouTubeOEmbed(url) {
+    const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const response = await fetch(oEmbedUrl, {
+        headers: {
+            "user-agent": "Mozilla/5.0",
+            "accept": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        return null;
+    }
+
+    const payload = await response.json();
+    return payload && typeof payload === "object" ? payload : null;
+}
+
 function platformFallbackImage(platform) {
     const images = {
         youtube: "https://www.youtube.com/img/desktop/yt_1200.png",
@@ -142,12 +197,28 @@ function platformFallbackImage(platform) {
     return images[platform] || "";
 }
 
+// Builds the standard YouTube thumbnail URL from a resolved video id.
+// Input: YouTube video id string.
+// Output: thumbnail URL string or an empty string.
+function buildYouTubeThumbnail(videoId) {
+    if (!videoId) {
+        return "";
+    }
+
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 function extractBestTitle(result, sourceUrl, platform) {
+    const descriptionFallbackTitle = buildTitleFromDescription(
+        extractBestDescription(result),
+        platform,
+    );
     const jsonLdTitles = collectJsonLdTitles(result?.jsonLD);
     const titleCandidates = [
         ...(platform === "linkedin" ? jsonLdTitles : []),
         result?.ogTitle,
         result?.twitterTitle,
+        descriptionFallbackTitle,
         ...(platform !== "linkedin" ? jsonLdTitles : []),
         extractFromUrl(sourceUrl),
     ];
@@ -155,11 +226,7 @@ function extractBestTitle(result, sourceUrl, platform) {
     for (const candidate of titleCandidates) {
         const normalized = normalizeTitle(candidate);
 
-        if (!normalized) {
-            continue;
-        }
-
-        if (platform === "twitter" && isStatusId(normalized)) {
+        if (!normalized || isPoorTitleCandidate(normalized, platform)) {
             continue;
         }
 
@@ -185,11 +252,7 @@ function extractBestDescription(result) {
     ];
 
     for (const candidate of descriptionCandidates) {
-        if (typeof candidate !== "string") {
-            continue;
-        }
-
-        const normalized = candidate.trim();
+        const normalized = normalizeDescription(candidate);
 
         if (normalized) {
             return normalized;
@@ -373,9 +436,33 @@ function normalizeTitle(title) {
         return "";
     }
 
-    const cleaned = cleanTitle(title)
+    const cleaned = stripLeadingHashtagWall(
+        cleanTitle(title),
+    )
         .replace(/\s+/g, " ")
-        .trim();
+        .trim()
+        .slice(0, maxMetadataTitleCharacters);
+
+    return cleaned;
+}
+
+function normalizeDescription(description) {
+    if (!description || typeof description !== "string") {
+        return "";
+    }
+
+    const cleaned = stripLeadingHashtagWall(
+        description
+            .replace(/\s+/g, " ")
+            .trim(),
+    )
+        .replace(/^[^a-z0-9]+/i, "")
+        .trim()
+        .slice(0, maxMetadataDescriptionCharacters);
+
+    if (!cleaned || looksLikeHashtagWall(cleaned)) {
+        return "";
+    }
 
     return cleaned;
 }
@@ -422,12 +509,40 @@ function buildLinkedInFallbackTitle(sourceUrl) {
 
 function extractFromUrl(url) {
     try {
-        const clean = new URL(url).pathname;
+        const parsedUrl = new URL(url);
+
+        if (detectPlatform(url) === "youtube") {
+            return "";
+        }
+
+        const clean = parsedUrl.pathname;
         return clean
             .split("/")
             .filter(Boolean)
             .pop()
             ?.replace(/[-_]/g, " ") || "";
+    } catch {
+        return "";
+    }
+}
+
+// Extracts the canonical YouTube video id from watch, short, embed, and youtu.be URLs.
+// Input: YouTube URL string.
+// Output: video id string or an empty string.
+function extractYouTubeId(url) {
+    try {
+        const parsedUrl = new URL(url);
+        const hostname = parsedUrl.hostname.toLowerCase();
+
+        if (hostname.includes("youtu.be")) {
+            return parsedUrl.pathname.replace(/^\/+/, "").split("/")[0] || "";
+        }
+
+        if (parsedUrl.pathname.startsWith("/shorts/") || parsedUrl.pathname.startsWith("/embed/")) {
+            return parsedUrl.pathname.split("/").filter(Boolean)[1] || "";
+        }
+
+        return parsedUrl.searchParams.get("v") || "";
     } catch {
         return "";
     }
@@ -463,11 +578,91 @@ function sanitizeTag(tag) {
         .trim();
 }
 
+function buildTitleFromDescription(description, platform) {
+    const normalizedDescription = normalizeDescription(description);
+
+    if (!normalizedDescription) {
+        return "";
+    }
+
+    const sentences = normalizedDescription
+        .split(/[.!?]/)
+        .map(sentence => sentence.trim())
+        .filter(Boolean);
+
+    const candidate = sentences.find(sentence => {
+        const wordCount = sentence.split(/\s+/).filter(Boolean).length;
+
+        return wordCount >= 3
+            && wordCount <= 12
+            && !isPoorTitleCandidate(sentence, platform)
+            && !looksLikeContactLine(sentence);
+    });
+
+    return candidate ? normalizeTitle(candidate) : "";
+}
+
+function isPoorTitleCandidate(value, platform) {
+    const normalizedValue = String(value || "").trim();
+    const lowerCasedValue = normalizedValue.toLowerCase();
+
+    if (!normalizedValue) {
+        return true;
+    }
+
+    if (platform === "twitter" && isStatusId(normalizedValue)) {
+        return true;
+    }
+
+    if (looksLikeHashtagWall(normalizedValue)) {
+        return true;
+    }
+
+    if (looksLikeContactLine(normalizedValue)) {
+        return true;
+    }
+
+    if (["linkedin", "instagram", "twitter", "tweet", "post"].includes(lowerCasedValue)) {
+        return true;
+    }
+
+    return false;
+}
+
+function looksLikeHashtagWall(value) {
+    const normalizedValue = String(value || "").trim();
+    const hashtags = normalizedValue.match(/#[a-z0-9][a-z0-9-]*/gi) || [];
+    const words = normalizedValue.match(/[a-z0-9]+/gi) || [];
+
+    return hashtags.length >= 3 && hashtags.length >= Math.ceil(words.length * 0.4);
+}
+
+function looksLikeContactLine(value) {
+    const normalizedValue = String(value || "");
+
+    return /\b\S+@\S+\.\S+\b/.test(normalizedValue)
+        || /\+?\d[\d\s().-]{7,}\d/.test(normalizedValue)
+        || /\b(?:linkedin|github|portfolio|leetcode|https?:\/\/|www\.)\b/i.test(normalizedValue);
+}
+
+function stripLeadingHashtagWall(value) {
+    return String(value || "")
+        .replace(/^(?:#[a-z0-9][a-z0-9-]*\s*){3,}/gi, "")
+        .trim();
+}
+
 function fallback(url, platform) {
+    const fallbackTitle = platform === "youtube"
+        ? "YouTube Video"
+        : extractFromUrl(url) || "No title";
+    const fallbackImage = platform === "youtube"
+        ? buildYouTubeThumbnail(extractYouTubeId(url)) || platformFallbackImage(platform)
+        : platformFallbackImage(platform) || "";
+
     return {
-        title: extractFromUrl(url) || "No title",
+        title: fallbackTitle,
         description: "",
-        image: platformFallbackImage(platform) || "",
+        image: fallbackImage,
         siteName: platform,
         type: mapType(url, null),
         url,

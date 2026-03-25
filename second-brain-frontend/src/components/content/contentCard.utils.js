@@ -1,53 +1,48 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { getPreviewImage, getPreviewType } from '../../utils/previewHelper';
 
 dayjs.extend(relativeTime);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const MAX_CARD_TITLE_CHARS = 58;
+const MAX_CARD_DESCRIPTION_CHARS = 132;
+const MAX_VISIBLE_TAGS = 3;
+const MAX_TAG_CHARS = 16;
+const MAX_CHECKLIST_ITEMS = 2;
+const MAX_CHECKLIST_LINE_CHARS = 54;
 const genericTags = new Set(['upload', 'image', 'pdf', 'document', 'article', 'link', 'social', 'video']);
+const placeholderTitles = new Set(['no title', 'untitled archive', 'untitled document', 'untitled image']);
 
-// Maps backend content into the dashboard's high-level visual categories.
+// Maps backend content into high-level visual families used by the card renderer.
 // Input: saved content item from Redux.
-// Output: normalized kind string used by the card renderer.
+// Output: normalized kind string for card presentation.
 export function getContentKind(content) {
-  const normalizedType = String(content?.type || '').toLowerCase();
-  const normalizedUrl = String(content?.url || '').toLowerCase();
+  const previewType = getPreviewType(content);
 
-  if (normalizedType === 'image') {
+  if (previewType === 'image') {
     return 'image';
   }
 
-  if (normalizedType === 'pdf' || normalizedType === 'document' || isPdfUrl(normalizedUrl)) {
+  if (previewType === 'pdf') {
     return 'document';
   }
 
-  if (normalizedType === 'youtube' || normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be')) {
+  if (previewType === 'youtube') {
     return 'video';
   }
 
-  if (
-    ['tweet', 'x', 'linkedin', 'instagram'].includes(normalizedType)
-    || normalizedUrl.includes('twitter.com')
-    || normalizedUrl.includes('x.com')
-    || normalizedUrl.includes('linkedin.com')
-    || normalizedUrl.includes('instagram.com')
-  ) {
+  if (['instagram', 'linkedin', 'twitter'].includes(previewType)) {
     return 'social';
   }
 
   return 'article';
 }
 
-// Chooses a visual card layout so the masonry grid gets the same varied feel as the reference UI.
-// Input: content item and list index.
-// Output: card variant string used by the ContentCard component.
+// Chooses a visual card variant while keeping every card preview-first.
+// Input: content item and masonry index.
+// Output: card variant string.
 export function getCardVariant(content, index = 0) {
   const kind = getContentKind(content);
-  const hasPreview = Boolean(getPreviewSource(content));
-
-  if (kind === 'social') {
-    return 'quote';
-  }
 
   if (kind === 'document') {
     return 'document';
@@ -57,130 +52,74 @@ export function getCardVariant(content, index = 0) {
     return 'collection';
   }
 
-  if (kind === 'image' || kind === 'video' || hasPreview) {
-    return 'media';
-  }
-
-  return 'article';
+  return 'media';
 }
 
-// Resolves the primary outbound URL for the card.
+// Resolves the outbound destination URL for a card.
 // Input: content item.
-// Output: absolute URL string or '#'.
+// Output: absolute URL string or `#`.
 export function getDestinationUrl(content) {
   const destination = String(content?.url || content?.image || '').trim();
   return destination || '#';
 }
 
-// Resolves the preview asset for image-heavy cards, routing third-party images through the backend proxy when needed.
-// Input: content item from Redux.
-// Output: preview image URL string or an empty string.
+// Resolves the visual preview source for a card.
+// Input: content item.
+// Output: image URL or generated fallback image URL.
 export function getPreviewSource(content) {
-  const kind = getContentKind(content);
-  const normalizedImage = String(content?.image || '').trim();
-  const destinationUrl = getDestinationUrl(content);
-
-  if (kind === 'video') {
-    return getYouTubeThumbnail(destinationUrl);
-  }
-
-  if (kind === 'image') {
-    return normalizedImage || destinationUrl;
-  }
-
-  if (!normalizedImage) {
-    return '';
-  }
-
-  if (normalizedImage.includes('/content/image-proxy?')) {
-    return normalizedImage;
-  }
-
-  if (!/^https?:\/\//i.test(normalizedImage)) {
-    return normalizedImage;
-  }
-
-  const normalizedApiUrl = API_URL.replace(/\/+$/, '');
-  const params = new URLSearchParams({ url: normalizedImage });
-
-  if (destinationUrl) {
-    params.set('source', destinationUrl);
-  }
-
-  return `${normalizedApiUrl}/content/image-proxy?${params.toString()}`;
+  return getPreviewImage(content);
 }
 
-// Produces a readable title with document and social fallbacks.
+// Produces a readable title with frontend-side cleanup when saved metadata is low quality.
 // Input: content item.
-// Output: presentation-ready title string.
+// Output: compact presentation-ready title string.
 export function getDisplayTitle(content) {
-  const normalizedType = String(content?.type || '').toLowerCase();
-  const trimmedTitle = String(content?.title || '').trim();
-
-  if (trimmedTitle) {
-    return trimmedTitle;
-  }
-
-  if (normalizedType === 'image') {
-    return 'Untitled Image';
-  }
-
-  if (normalizedType === 'pdf' || normalizedType === 'document') {
-    return 'Untitled Document';
-  }
-
-  return 'Untitled Archive';
+  return truncateText(resolveTitleText(content), MAX_CARD_TITLE_CHARS);
 }
 
-// Produces a concise description for cards without leaking long or noisy bodies into the UI.
+// Produces a concise description while removing hashtags, contact dumps, and repeated title text.
 // Input: content item.
-// Output: clipped description string.
+// Output: clipped description string with a clean fallback.
 export function getDisplayDescription(content) {
-  return String(content?.description || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 180);
+  const resolvedTitle = resolveTitleText(content);
+  return truncateText(resolveDescriptionText(content, resolvedTitle), MAX_CARD_DESCRIPTION_CHARS);
 }
 
 // Produces filtered searchable tags for chip display.
-// Input: content item and optional max tag count.
-// Output: deduplicated tag array.
-export function getDisplayTags(content, limit = 4) {
-  const tags = (content?.tags || [])
+// Input: content item and optional maximum tag count.
+// Output: deduplicated normalized tag array formatted for the card UI.
+export function getDisplayTags(content, limit = MAX_VISIBLE_TAGS) {
+  const rawTags = (content?.tags || [])
     .map((tag) => String(tag || '').toLowerCase().replace(/^#+/, '').trim())
-    .filter((tag) => tag.length > 1 && !genericTags.has(tag));
+    .filter((tag) => tag.length > 1 && !genericTags.has(tag) && !looksLikeHashtagWall(tag));
 
-  return Array.from(new Set(tags)).slice(0, limit);
+  return Array.from(new Set(rawTags))
+    .slice(0, limit)
+    .map(formatTagLabel);
 }
 
-// Returns the small uppercase badge shown on cards.
+// Returns the small uppercase badge shown inside the preview area.
 // Input: content item.
-// Output: short label string for the card header.
+// Output: short label string.
 export function getCardLabel(content) {
   const tags = getDisplayTags(content, 1);
-  const kind = getContentKind(content);
+  const previewType = getPreviewType(content);
 
   if (tags.length) {
-    return tags[0].replace(/-/g, ' ').toUpperCase();
+    return truncateText(tags[0].replace(/-/g, ' ').toUpperCase(), 18);
   }
 
-  if (kind === 'video') {
-    return 'DOCUMENTARY';
-  }
+  const labels = {
+    youtube: 'YOUTUBE',
+    instagram: 'INSTAGRAM',
+    linkedin: 'LINKEDIN',
+    twitter: 'X / TWITTER',
+    pdf: 'PDF DOCUMENT',
+    image: 'VISUAL',
+    article: 'WEB LINK',
+  };
 
-  if (kind === 'document') {
-    return 'WHITE PAPER';
-  }
-
-  if (kind === 'social') {
-    return 'PHILOSOPHY';
-  }
-
-  if (kind === 'image') {
-    return 'VISUAL';
-  }
-
-  return 'RESEARCH';
+  return labels[previewType] || 'ARCHIVE';
 }
 
 // Formats the saved timestamp for footer metadata.
@@ -201,9 +140,8 @@ export function getFooterMeta(content) {
   const kind = getContentKind(content);
   const tags = getDisplayTags(content);
 
-  if (kind === 'video' || kind === 'article') {
-    const wordCount = String(content?.description || '').split(/\s+/).filter(Boolean).length;
-    return `${Math.max(1, Math.round(wordCount / 160) || 1)} min read`;
+  if (kind === 'document') {
+    return 'Open PDF';
   }
 
   if (kind === 'image') {
@@ -211,68 +149,303 @@ export function getFooterMeta(content) {
   }
 
   if (kind === 'social') {
-    return `${Math.max(String(content?.description || getDisplayTitle(content)).split(/\s+/).filter(Boolean).length, 12)} words`;
+    return 'Social capture';
   }
 
-  return 'Open original file';
+  if (kind === 'video') {
+    return 'Video reference';
+  }
+
+  return 'Saved link';
 }
 
-// Builds list items for the document card checklist layout.
+// Builds list items for the document detail block without exposing contact-heavy OCR dumps.
 // Input: content item.
-// Output: up to three checklist lines.
+// Output: up to two short checklist lines.
 export function getDocumentChecklist(content) {
-  const descriptionSentences = getDisplayDescription(content)
+  const resolvedTitle = resolveTitleText(content);
+  const cleanedDescription = resolveDescriptionText(content, resolvedTitle);
+  const descriptionSentences = cleanedDescription
     .split(/[.!?]/)
-    .map((sentence) => sentence.trim())
+    .map((sentence) => normalizeText(sentence))
     .filter((sentence) => sentence.length > 8)
-    .slice(0, 3);
+    .slice(0, MAX_CHECKLIST_ITEMS)
+    .map((sentence) => truncateText(sentence, MAX_CHECKLIST_LINE_CHARS));
 
   if (descriptionSentences.length) {
     return descriptionSentences;
   }
 
-  const tags = getDisplayTags(content, 3).map((tag) => `Catalogued under ${tag.replace(/-/g, ' ')}`);
+  const tags = getDisplayTags(content, 2).map((tag) => `Tagged under ${tag}`);
   return tags.length ? tags : ['Open the source file for the complete document.'];
 }
 
-// Generates a compact source label for article/social cards.
+// Generates a compact source label for card metadata.
 // Input: content item.
-// Output: readable hostname or kind label.
+// Output: readable source label string.
 export function getSourceLabel(content) {
-  const fallback = getContentKind(content);
+  const previewType = getPreviewType(content);
+  const previewLabels = {
+    youtube: 'youtube',
+    instagram: 'instagram',
+    linkedin: 'linkedin',
+    twitter: 'x / twitter',
+    pdf: 'pdf document',
+  };
+
+  if (previewLabels[previewType]) {
+    return previewLabels[previewType];
+  }
 
   try {
     const hostname = new URL(getDestinationUrl(content)).hostname.replace(/^www\./, '');
-    return hostname || fallback;
+    return hostname || 'archive';
   } catch {
-    return fallback;
+    return previewType === 'image' ? 'image upload' : 'archive';
   }
 }
 
-function getYouTubeThumbnail(url) {
-  const videoId = extractYouTubeId(url);
+function resolveTitleText(content) {
+  const kind = getContentKind(content);
+  const previewType = getPreviewType(content);
+  const titleCandidates = [
+    normalizeTitleCandidate(content?.title, previewType),
+    extractTitleFromDescription(content?.description),
+    previewType === 'youtube' ? '' : extractTitleFromUrl(getDestinationUrl(content)),
+  ];
 
-  if (!videoId) {
+  const resolvedTitle = titleCandidates.find(Boolean);
+
+  if (resolvedTitle) {
+    return resolvedTitle;
+  }
+
+  if (kind === 'image') {
+    return 'Untitled Image';
+  }
+
+  if (kind === 'document') {
+    return 'Untitled PDF';
+  }
+
+  if (kind === 'video') {
+    return 'YouTube Video';
+  }
+
+  return 'Untitled Archive';
+}
+
+function resolveDescriptionText(content, resolvedTitle) {
+  const kind = getContentKind(content);
+  const description = cleanDescriptionText(content?.description, resolvedTitle);
+
+  if (description) {
+    return description;
+  }
+
+  if (kind === 'document') {
+    return 'Document saved to your archive with a dedicated file preview.';
+  }
+
+  if (kind === 'video') {
+    return 'Video reference saved with a visual thumbnail for quick recall.';
+  }
+
+  if (kind === 'social') {
+    return 'Social content captured with a visual fallback so it stays scannable in the gallery.';
+  }
+
+  if (kind === 'image') {
+    return 'Visual reference saved to your archive for later inspiration.';
+  }
+
+  return 'Web content saved to your archive with a visual preview-first layout.';
+}
+
+function normalizeTitleCandidate(value, previewType = '') {
+  const normalizedTitle = normalizeText(value);
+
+  if (!normalizedTitle) {
     return '';
   }
 
-  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  if (placeholderTitles.has(normalizedTitle.toLowerCase())) {
+    return '';
+  }
+
+  if (looksLikeHashtagWall(normalizedTitle) || looksLikeContactLine(normalizedTitle)) {
+    return '';
+  }
+
+  if (previewType === 'youtube' && looksLikeYouTubeId(normalizedTitle)) {
+    return '';
+  }
+
+  return polishTitle(stripLeadingNoise(normalizedTitle));
 }
 
-function extractYouTubeId(url) {
+function extractTitleFromDescription(value) {
+  const lines = String(value || '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => normalizeText(removeContactFragments(stripLeadingNoise(line))))
+    .filter(Boolean)
+    .filter((line) => !looksLikeHashtagWall(line) && !looksLikeContactLine(line));
+
+  const titleCandidate = lines.find((line) => {
+    const wordCount = line.split(/\s+/).filter(Boolean).length;
+    return line.length >= 12 && wordCount >= 3 && wordCount <= 10;
+  });
+
+  return titleCandidate ? polishTitle(titleCandidate) : '';
+}
+
+function cleanDescriptionText(value, resolvedTitle = '') {
+  const cleanedLines = String(value || '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => stripLeadingNoise(line))
+    .map(removeContactFragments)
+    .map(normalizeText)
+    .filter(Boolean)
+    .filter((line) => !looksLikeHashtagWall(line) && !looksLikeContactLine(line));
+
+  if (!cleanedLines.length) {
+    return '';
+  }
+
+  const normalizedTitle = normalizeText(resolvedTitle).toLowerCase();
+  const cleanedDescription = cleanedLines
+    .map((line) => {
+      if (!normalizedTitle) {
+        return line;
+      }
+
+      if (line.toLowerCase() === normalizedTitle) {
+        return '';
+      }
+
+      if (line.toLowerCase().startsWith(normalizedTitle)) {
+        return normalizeText(line.slice(normalizedTitle.length).replace(/^(\s|:|\||,|\.|-)+/, ''));
+      }
+
+      return line;
+    })
+    .filter(Boolean)
+    .join(' ');
+
+  return normalizeText(cleanedDescription);
+}
+
+function formatTagLabel(tag) {
+  return truncateText(
+    String(tag || '')
+      .replace(/-/g, ' ')
+      .trim(),
+    MAX_TAG_CHARS,
+  );
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractTitleFromUrl(url) {
   try {
     const parsedUrl = new URL(url);
+    const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+    const lastSegment = pathSegments[pathSegments.length - 1] || parsedUrl.hostname.replace(/^www\./, '');
+    const withoutExtension = lastSegment.replace(/\.[a-z0-9]{2,6}$/i, '');
+    const withoutQueryNoise = withoutExtension.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-    if (parsedUrl.hostname.includes('youtu.be')) {
-      return parsedUrl.pathname.replace('/', '').trim();
+    if (!withoutQueryNoise) {
+      return '';
     }
 
-    return parsedUrl.searchParams.get('v') || '';
+    return polishTitle(humanizeTitle(withoutQueryNoise));
   } catch {
     return '';
   }
 }
 
-function isPdfUrl(url) {
-  return /\.pdf(?:$|[?#])/i.test(String(url || '').trim());
+function humanizeTitle(value) {
+  return String(value || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((segment) => {
+      if (segment.length <= 3 && segment === segment.toUpperCase()) {
+        return segment;
+      }
+
+      return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function polishTitle(value) {
+  const normalizedValue = normalizeText(value);
+
+  if (!normalizedValue) {
+    return '';
+  }
+
+  if (normalizedValue === normalizedValue.toLowerCase()) {
+    return humanizeTitle(normalizedValue);
+  }
+
+  return normalizedValue;
+}
+
+function looksLikeHashtagWall(value) {
+  const normalizedValue = normalizeText(value);
+  const hashtags = normalizedValue.match(/#[a-z0-9][a-z0-9-]*/gi) || [];
+  const words = normalizedValue.match(/[a-z0-9]+/gi) || [];
+
+  return hashtags.length >= 3 && hashtags.length >= Math.ceil(words.length * 0.4);
+}
+
+function looksLikeContactLine(value) {
+  const normalizedValue = String(value || '');
+
+  return /\b\S+@\S+\.\S+\b/.test(normalizedValue)
+    || /\+?\d[\d\s().-]{7,}\d/.test(normalizedValue)
+    || /\b(?:linkedin|github|portfolio|leetcode|mailto|www\.|https?:\/\/)\b/i.test(normalizedValue);
+}
+
+function stripLeadingNoise(value) {
+  const normalizedValue = normalizeText(value)
+    .replace(/^(?:#[a-z0-9][a-z0-9-]*\s*){3,}/gi, '')
+    .replace(/^[^a-z0-9]+/i, '')
+    .trim();
+
+  return normalizedValue;
+}
+
+function removeContactFragments(value) {
+  return String(value || '')
+    .replace(/\b\S+@\S+\.\S+\b/gi, ' ')
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, ' ')
+    .replace(/\b(?:linkedin|github|portfolio|leetcode)\b/gi, ' ')
+    .replace(/\bhttps?:\/\/\S+/gi, ' ')
+    .replace(/\bwww\.\S+/gi, ' ')
+    .replace(/[|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncateText(value, maxLength) {
+  const normalizedValue = normalizeText(value);
+
+  if (normalizedValue.length <= maxLength) {
+    return normalizedValue;
+  }
+
+  return `${normalizedValue.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+function looksLikeYouTubeId(value) {
+  return /^[a-zA-Z0-9_-]{10,12}$/.test(String(value || '').trim());
 }

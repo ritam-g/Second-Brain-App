@@ -9,11 +9,19 @@ const genericFileNamePatterns = [
     /^dsc[_-]?\d+/i,
 ]
 const blockedTags = new Set([
+    "com",
     "corrupted",
+    "email",
+    "gmail",
     "garbled",
+    "github",
     "illegible",
+    "leetcode",
+    "linkedin",
     "metadata",
     "ocr",
+    "phone",
+    "portfolio",
     "sample",
     "text",
     "unreadable",
@@ -31,15 +39,20 @@ const stopWords = new Set([
     "document",
     "file",
     "from",
+    "gmail",
+    "github",
     "have",
     "image",
     "into",
     "just",
+    "leetcode",
+    "linkedin",
     "like",
     "more",
     "only",
     "other",
     "over",
+    "portfolio",
     "saved",
     "that",
     "their",
@@ -62,7 +75,7 @@ export async function resolveUploadMetadata({
     extractedText,
     ocrConfidence,
 }) {
-    const normalizedManualTitle = normalizeSingleLine(manualTitle)
+    const normalizedManualTitle = polishTitle(normalizeSingleLine(manualTitle))
     const cleanedText = sanitizeExtractedText(extractedText)
     const extractedTitle = extractTitleCandidate(cleanedText)
     const textQuality = analyzeExtractedText(cleanedText, { uploadType, ocrConfidence })
@@ -226,11 +239,13 @@ function extractTitleCandidate(text) {
 
         return line.length >= 3
             && line.length <= 90
+            && !looksLikeHashtagWall(line)
+            && !looksLikeContactLine(line)
             && wordCount <= 10
             && !isNoiseLine(line)
     })
 
-    return titleLine ? titleLine.slice(0, 80) : ""
+    return titleLine ? polishTitle(titleLine.slice(0, 80)) : ""
 }
 
 // Builds a readable title from the uploaded file name when OCR text is missing or unreliable.
@@ -279,11 +294,12 @@ function buildFallbackDescription({ fallbackTitle, uploadType, cleanedText, text
 // Input: cleaned OCR/PDF text string and the resolved title.
 // Output: short description string suitable for dashboard cards.
 function buildDescriptionSnippet(text, fallbackTitle) {
-    const normalizedText = String(text || "")
-        .replace(/\n+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
+    const normalizedText = buildReadableSummaryText(text, fallbackTitle)
     const normalizedTitle = normalizeSingleLine(fallbackTitle)
+
+    if (!normalizedText) {
+        return `${fallbackTitle} saved to Second Brain. Open the file to view the full document.`
+    }
 
     if (normalizedTitle && normalizedText.toLowerCase().startsWith(normalizedTitle.toLowerCase())) {
         const remainder = normalizeSingleLine(
@@ -304,6 +320,7 @@ function buildDescriptionSnippet(text, fallbackTitle) {
 // Input: resolved title, original file name, upload type, cleaned text, and text quality analysis.
 // Output: normalized array of tags capped for MongoDB storage.
 function buildFallbackTags({ fallbackTitle, originalName, uploadType, cleanedText, textQuality }) {
+    const summaryText = buildReadableSummaryText(cleanedText, fallbackTitle)
     const candidates = [
         uploadType,
         "upload",
@@ -312,7 +329,7 @@ function buildFallbackTags({ fallbackTitle, originalName, uploadType, cleanedTex
     ]
 
     if (textQuality.isReadable) {
-        candidates.push(...extractKeywords(cleanedText))
+        candidates.push(...extractKeywords(summaryText))
     }
 
     return normalizeTags(candidates)
@@ -324,11 +341,16 @@ function buildFallbackTags({ fallbackTitle, originalName, uploadType, cleanedTex
 function resolveFinalTitle(aiTitle, fallbackTitle) {
     const normalizedAiTitle = normalizeSingleLine(aiTitle)
 
-    if (!normalizedAiTitle || looksUnreadable(normalizedAiTitle)) {
+    if (
+        !normalizedAiTitle
+        || looksUnreadable(normalizedAiTitle)
+        || looksLikeHashtagWall(normalizedAiTitle)
+        || looksLikeContactLine(normalizedAiTitle)
+    ) {
         return fallbackTitle
     }
 
-    return normalizedAiTitle.slice(0, 80)
+    return polishTitle(normalizedAiTitle.slice(0, 80))
 }
 
 // Resolves the final persisted description while rejecting noisy or overlong AI output.
@@ -340,6 +362,8 @@ function resolveFinalDescription(aiDescription, fallbackDescription) {
     if (
         !normalizedAiDescription
         || looksUnreadable(normalizedAiDescription)
+        || looksLikeHashtagWall(normalizedAiDescription)
+        || looksLikeContactLine(normalizedAiDescription)
         || /no reliable ocr text/i.test(normalizedAiDescription)
     ) {
         return fallbackDescription
@@ -377,6 +401,7 @@ function normalizeTags(tags) {
     const normalizedTags = tags
         .map(sanitizeTag)
         .filter(Boolean)
+        .filter(tag => !/^\d+$/.test(tag))
         .filter(tag => !blockedTags.has(tag))
 
     return [...new Set(normalizedTags)].slice(0, maxSavedTags)
@@ -455,6 +480,44 @@ function normalizeSingleLine(value) {
         .trim()
 }
 
+// Builds a summary line from readable OCR/PDF text while removing contact blocks and hashtag walls.
+// Input: cleaned extracted text and the resolved title.
+// Output: compact summary string safe for card descriptions.
+function buildReadableSummaryText(text, fallbackTitle) {
+    const normalizedTitle = normalizeSingleLine(fallbackTitle).toLowerCase()
+    const summaryLines = String(text || "")
+        .split("\n")
+        .map(line => stripLeadingHashtagWall(line))
+        .map(removeContactFragments)
+        .map(line => normalizeSingleLine(line))
+        .filter(Boolean)
+        .filter(line => !isNoiseLine(line))
+        .filter(line => !looksLikeHashtagWall(line))
+        .filter(line => !looksLikeContactLine(line))
+        .filter(line => {
+            const wordCount = line.split(/\s+/).filter(Boolean).length
+            return wordCount >= 3 || line.length >= 24
+        })
+        .map(line => {
+            if (!normalizedTitle) {
+                return line
+            }
+
+            if (line.toLowerCase() === normalizedTitle) {
+                return ""
+            }
+
+            if (line.toLowerCase().startsWith(normalizedTitle)) {
+                return normalizeSingleLine(line.slice(normalizedTitle.length).replace(/^(\s|:|\||,|\.|-)+/, ""))
+            }
+
+            return line
+        })
+        .filter(Boolean)
+
+    return summaryLines.join(" ").slice(0, maxDescriptionCharacters)
+}
+
 // Removes the final file extension so filenames can become titles and tags.
 // Input: original file name string.
 // Output: file name without the last extension.
@@ -478,4 +541,67 @@ function toTitleCase(value) {
             return lowerCasedWord.charAt(0).toUpperCase() + lowerCasedWord.slice(1)
         })
         .join(" ")
+}
+
+// Polishes saved titles so lower-case manual or OCR-derived titles render like intentional metadata.
+// Input: normalized title string.
+// Output: title-cased string when the source title is entirely lowercase.
+function polishTitle(value) {
+    const normalizedValue = normalizeSingleLine(value)
+
+    if (!normalizedValue) {
+        return ""
+    }
+
+    if (normalizedValue === normalizedValue.toLowerCase()) {
+        return toTitleCase(normalizedValue)
+    }
+
+    return normalizedValue
+}
+
+// Detects strings that are mostly hashtag lists instead of readable titles or summaries.
+// Input: free-form title or description string.
+// Output: boolean indicating whether the text is hashtag-heavy.
+function looksLikeHashtagWall(value) {
+    const normalizedValue = normalizeSingleLine(value)
+    const hashtags = normalizedValue.match(/#[a-z0-9][a-z0-9-]*/gi) || []
+    const words = normalizedValue.match(/[a-z0-9]+/gi) || []
+
+    return hashtags.length >= 3 && hashtags.length >= Math.ceil(words.length * 0.4)
+}
+
+// Detects contact-heavy OCR lines so they do not become saved titles or summaries.
+// Input: one normalized metadata string.
+// Output: boolean indicating whether the line is mostly contact info.
+function looksLikeContactLine(value) {
+    const normalizedValue = String(value || "")
+
+    return /\b\S+@\S+\.\S+\b/.test(normalizedValue)
+        || /\+?\d[\d\s().-]{7,}\d/.test(normalizedValue)
+        || /\b(?:linkedin|github|portfolio|leetcode|https?:\/\/|www\.)\b/i.test(normalizedValue)
+}
+
+// Removes leading hashtag walls from OCR/PDF text before titles and descriptions are derived.
+// Input: raw OCR/PDF line string.
+// Output: cleaned line string.
+function stripLeadingHashtagWall(value) {
+    return String(value || "")
+        .replace(/^(?:#[a-z0-9][a-z0-9-]*\s*){3,}/gi, "")
+        .trim()
+}
+
+// Removes contact fragments from OCR/PDF lines so descriptions stay readable.
+// Input: raw OCR/PDF line string.
+// Output: cleaned line string with contact tokens removed.
+function removeContactFragments(value) {
+    return String(value || "")
+        .replace(/\b\S+@\S+\.\S+\b/gi, " ")
+        .replace(/\+?\d[\d\s().-]{7,}\d/g, " ")
+        .replace(/\b(?:linkedin|github|portfolio|leetcode)\b/gi, " ")
+        .replace(/\bhttps?:\/\/\S+/gi, " ")
+        .replace(/\bwww\.\S+/gi, " ")
+        .replace(/[|]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
 }

@@ -45,7 +45,7 @@ export async function generateUploadMetadataFromText(text, context = {}) {
     const response = await model.invoke([
         [
             "system",
-            "Create clean metadata for uploaded PDFs or images. Return ONLY a JSON object with keys title, description, and tags. Never repeat garbled OCR. If text is unreliable, use the file name and file type to create neutral, readable metadata. Keep title under 80 characters, description under 180 characters, and tags focused and useful.",
+            "Create clean metadata for uploaded PDFs or images. Return ONLY a JSON object with keys title, description, and tags. Never repeat garbled OCR. If text is unreliable, use the file name and file type to create neutral, readable metadata. Title must never be a hashtag list, email address, phone number, username wall, or URL. Description must summarize the content instead of dumping contact details or raw OCR noise. Keep title under 80 characters, description under 180 characters, and tags focused and useful.",
         ],
         ["human", buildMetadataPromptText(text, context)],
     ])
