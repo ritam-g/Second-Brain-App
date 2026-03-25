@@ -43,6 +43,7 @@ export async function getMetadata(url) {
 
         tags.push(platform);
         tags = [...new Set(tags)];
+        console.log(result);
         
         return {
             title,

@@ -17,36 +17,32 @@ const ContentCard = ({ content }) => {
 
   const handleDelete = async (e) => {
     e.preventDefault();
-    if(window.confirm('Are you sure you want to delete this content?')) {
+    if (window.confirm('Are you sure you want to delete this content?')) {
       await deleteContent(_id);
     }
   };
 
   const showImage = Boolean(image) && !imageFailed;
+  console.log(image);
+  console.log(showImage);
+
 
   return (
     <div className="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:-translate-y-1">
       {/* Image section */}
-      {showImage ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
-          <img 
-            src={image} 
-            alt={displayTitle} 
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            referrerPolicy="no-referrer"
-            onError={() => setImageFailed(true)}
-          />
-        </a>
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 flex items-center justify-center block">
-          <div className="flex flex-col items-center gap-3 text-slate-400">
-            <Bookmark className="w-12 h-12 text-slate-300" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em]">
-              {platformLabel || 'Web'}
-            </span>
-          </div>
-        </a>
-      )}
+
+      (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
+        <img
+          src={image}
+          alt={displayTitle}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+        />
+      </a>
+      )
+
 
       {/* Content section */}
       <div className="p-6 flex flex-col flex-1">
@@ -60,7 +56,7 @@ const ContentCard = ({ content }) => {
         <a href={url} target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-slate-800 leading-snug mb-2 line-clamp-2 hover:text-primary transition-colors" title={displayTitle}>
           {displayTitle}
         </a>
-        
+
         {description && (
           <p className="text-sm text-slate-500 line-clamp-2 mb-4">
             {description}
@@ -81,16 +77,16 @@ const ContentCard = ({ content }) => {
             {createdAt ? new Date(createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown Date'}
           </span>
           <div className="flex items-center gap-1">
-            <button 
+            <button
               onClick={handleDelete}
               className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
               title="Delete content"
             >
               <Trash2 className="w-4 h-4" />
             </button>
-            <a 
-              href={url} 
-              target="_blank" 
+            <a
+              href={url}
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:text-primary-dark p-2 hover:bg-slate-50 rounded-full transition-colors"
               title="Open original"

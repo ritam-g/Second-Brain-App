@@ -40,6 +40,8 @@ const Dashboard = () => {
       if(item.type) tags.add(item.type);
       if(item.tags) item.tags.forEach(t => tags.add(t));
     });
+    console.log(items);
+    
     return Array.from(tags);
   }, [items]);
 
