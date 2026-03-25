@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
 import { getContentApi, saveContentApi, deleteContentApi } from '../api/content.api';
+import { getApiErrorMessage } from '../lib/api-error';
+import { notify } from '../lib/toast';
 
 export const useGetContent = () => {
   const dispatch = useDispatch();
@@ -14,7 +16,7 @@ export const useGetContent = () => {
       dispatch(setContentData(payload || []));
       return { success: true, data: payload };
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to fetch content';
+      const message = getApiErrorMessage(err, 'Failed to fetch content');
       dispatch(setContentError(message));
       return { success: false, error: message };
     }
@@ -25,43 +27,67 @@ export const useGetContent = () => {
 
 export const useSaveContent = () => {
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
 
   const saveContent = async (contentData) => {
+    setLoading(true);
     dispatch(setContentLoading(true));
     try {
-      const response = await saveContentApi(contentData);
+      const response = await notify.promise(
+        saveContentApi(contentData),
+        {
+          pending: 'Saving link to your library...',
+          success: () => 'Content saved successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to save content'),
+        },
+        { toastId: 'save-content-request' },
+      );
       const payload = response.data !== undefined ? response.data : response;
       if (payload) {
         dispatch(addContentItem(payload));
       }
       return { success: true, data: payload };
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to save content';
+      const message = getApiErrorMessage(err, 'Failed to save content');
       dispatch(setContentError(message));
       return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
   };
 
-  return { saveContent };
+  return { saveContent, loading };
 };
 
 export const useDeleteContent = () => {
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
 
   const deleteContent = async (id) => {
+    setLoading(true);
     dispatch(setContentLoading(true));
     try {
-      await deleteContentApi(id);
+      await notify.promise(
+        deleteContentApi(id),
+        {
+          pending: 'Removing content...',
+          success: (result) => result?.message || 'Content deleted successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to delete content'),
+        },
+        { toastId: `delete-content-${id}` },
+      );
       dispatch(removeContentItem(id));
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to delete content';
+      const message = getApiErrorMessage(err, 'Failed to delete content');
       dispatch(setContentError(message));
       return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
   };
 
-  return { deleteContent };
+  return { deleteContent, loading };
 };
 
 /**

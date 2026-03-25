@@ -12,6 +12,7 @@ const contentSlice = createSlice({
   reducers: {
     setContentLoading: (state, action) => {
       state.loading = action.payload;
+      state.error = null;
     },
     setContentError: (state, action) => {
       state.error = action.payload;

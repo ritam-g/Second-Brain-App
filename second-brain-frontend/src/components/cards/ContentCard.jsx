@@ -7,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const ContentCard = ({ content }) => {
   const { _id, title, description, image, url, tags, type, siteName, createdAt } = content;
-  const { deleteContent } = useDeleteContent();
+  const { deleteContent, loading } = useDeleteContent();
   const [imageFailed, setImageFailed] = useState(false);
   const platformLabel = getPlatformLabel(url, type, siteName);
   const displayTitle = getDisplayTitle(url, title, description);
@@ -97,7 +97,8 @@ const ContentCard = ({ content }) => {
           <div className="flex items-center gap-1">
             <button
               onClick={handleDelete}
-              className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
+              disabled={loading}
+              className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               title="Delete content"
             >
               <Trash2 className="w-4 h-4" />

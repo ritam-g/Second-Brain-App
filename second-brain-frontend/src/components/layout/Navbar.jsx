@@ -22,9 +22,14 @@ const Navbar = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        <Button variant="ghost" className="text-sm font-semibold !px-3" onClick={handleLogout}>
-          <LogOut className="w-4 h-4 mr-2" />
-          Logout
+        <Button
+          variant="ghost"
+          className="text-sm font-semibold !px-3"
+          onClick={handleLogout}
+          loading={loading}
+        >
+          {!loading && <LogOut className="w-4 h-4 mr-2" />}
+          {loading ? 'Logging out...' : 'Logout'}
         </Button>
       </div>
     </nav>

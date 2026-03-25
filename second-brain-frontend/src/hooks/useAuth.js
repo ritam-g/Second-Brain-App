@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess, logout, setAuthLoading } from '../redux/slices/authSlice';
 import { loginUserApi, registerUserApi, checkAuthApi, logoutApi } from '../api/auth.api';
+import { getApiErrorMessage } from '../lib/api-error';
+import { notify } from '../lib/toast';
 
 // BENEFIT of useAuthCheck: 
 // Runs exactly once when the application mounts (inside App.jsx). It asks the backend if the secure cookie is valid.
@@ -19,7 +21,7 @@ export const useAuthCheck = () => {
         } else {
           dispatch(logout());
         }
-      } catch (error) {
+      } catch {
         dispatch(logout());
       } finally {
         dispatch(setAuthLoading(false));
@@ -35,52 +37,66 @@ export const useAuthCheck = () => {
 // We completely trust the backend to embed the `jwtToken` into an HTTP-Only cookie. We simply consume the generic user info it returns.
 export const useLogin = () => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const dispatch = useDispatch();
 
   const loginUser = async (credentials) => {
     setLoading(true);
-    setError(null);
     try {
-      const response = await loginUserApi(credentials);
-      const user = response.data?.user;
-      
-      if (!user) throw new Error("User data not found in response");
-      
-      dispatch(loginSuccess(user));
+      const loginRequest = loginUserApi(credentials).then((result) => {
+        if (!result?.data?.user) {
+          throw new Error('User data not found in response');
+        }
+
+        return result;
+      });
+
+      const response = await notify.promise(
+        loginRequest,
+        {
+          pending: 'Signing you in...',
+          success: (result) => result?.message || 'Welcome back.',
+          error: (error) => getApiErrorMessage(error, 'Login failed'),
+        },
+        { toastId: 'login-request' },
+      );
+      dispatch(loginSuccess(response.data.user));
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Login failed';
-      setError(message);
+      const message = getApiErrorMessage(err, 'Login failed');
       return { success: false, error: message };
     } finally {
       setLoading(false);
     }
   };
 
-  return { loginUser, loading, error, setError };
+  return { loginUser, loading };
 };
 
 export const useRegister = () => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const registerUser = async (userData) => {
     setLoading(true);
-    setError(null);
     try {
-      await registerUserApi(userData);
+      await notify.promise(
+        registerUserApi(userData),
+        {
+          pending: 'Creating your account...',
+          success: (result) => result?.message || 'Account created successfully.',
+          error: (error) => getApiErrorMessage(error, 'Registration failed'),
+        },
+        { toastId: 'register-request' },
+      );
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || 'Registration failed';
-      setError(message);
+      const message = getApiErrorMessage(err, 'Registration failed');
       return { success: false, error: message };
     } finally {
       setLoading(false);
     }
   };
 
-  return { registerUser, loading, error, setError };
+  return { registerUser, loading };
 };
 
 // BENEFIT of useLogout:
@@ -93,11 +109,20 @@ export const useLogout = () => {
   const performLogout = async () => {
     setLoading(true);
     try {
-      await logoutApi();
-    } catch (err) {
-      console.error('Logout API issue:', err);
-    } finally {
+      await notify.promise(
+        logoutApi(),
+        {
+          pending: 'Signing you out...',
+          success: (result) => result?.message || 'Logged out successfully.',
+          error: (error) => getApiErrorMessage(error, 'Logout failed'),
+        },
+        { toastId: 'logout-request' },
+      );
       dispatch(logout());
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getApiErrorMessage(err, 'Logout failed') };
+    } finally {
       setLoading(false);
     }
   };

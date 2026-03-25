@@ -2,8 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --toastify-color-light: rgba(255, 255, 255, 0.94);
+  --toastify-text-color-light: #0f172a;
+  --toastify-toast-width: min(24rem, calc(100vw - 1.5rem));
+  --toastify-font-family: inherit;
+}
+
 @layer base {
   body {
     @apply bg-background text-slate-800 font-sans antialiased;
   }
+}
+
+.Toastify__toast-container {
+  padding: 0.75rem;
+}
+
+.Toastify__toast {
+  margin-bottom: 0.875rem;
+}
+
+.app-toast {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+  min-height: 0;
+  padding: 0;
+}
+
+.app-toast-body {
+  align-items: flex-start;
+  gap: 0.875rem;
+  margin: 0;
+  padding: 1rem 1rem 1rem 1.125rem;
+}
+
+.Toastify__toast-icon {
+  margin-inline-end: 0;
+  width: auto;
+}
+
+.app-toast-progress {
+  height: 3px;
+  background: linear-gradient(90deg, #0f766e 0%, #2563eb 55%, #7c3aed 100%);
 }

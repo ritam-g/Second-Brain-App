@@ -1,26 +1,39 @@
 import React, { useState } from 'react';
-import { useRegister } from '../../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import InputField from '../../components/ui/InputField';
-import Button from '../../components/ui/Button';
 import { BrainCircuit } from 'lucide-react';
+import { useRegister } from '../../hooks/useAuth';
+import Button from '../../components/ui/Button';
+import InputField from '../../components/ui/InputField';
+import { notify } from '../../lib/toast';
 
 const Register = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+
   const navigate = useNavigate();
-  const { registerUser, loading, error, setError } = useRegister();
+  const { registerUser, loading } = useRegister();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if(error) setError(null);
-    
-    if(!email || !password || !username) return;
-    
-    const result = await registerUser({ username, email, password });
-    if(result.success) {
+
+    if (!username.trim() || !email.trim() || !password.trim()) {
+      notify.warning('Complete every field before creating your account.', { toastId: 'register-validation' });
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      notify.warning('Use a password with at least 6 characters.', { toastId: 'register-password-validation' });
+      return;
+    }
+
+    const result = await registerUser({
+      username: username.trim(),
+      email: email.trim(),
+      password,
+    });
+
+    if (result.success) {
       navigate('/login');
     }
   };
@@ -36,42 +49,35 @@ const Register = () => {
           <p className="text-slate-500 mt-2 text-center text-sm">Start your digital curation journey.</p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium mb-6 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-600 block"></span>
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          <InputField 
-            label="Full Name" 
-            type="text" 
-            placeholder="John Doe" 
+          <InputField
+            label="Full Name"
+            type="text"
+            placeholder="John Doe"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
           />
-          <InputField 
-            label="Email Address" 
-            type="email" 
-            placeholder="name@company.com" 
+          <InputField
+            label="Email Address"
+            type="email"
+            placeholder="name@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <InputField 
-            label="Create Password" 
-            type="password" 
-            placeholder="••••••••" 
+          <InputField
+            label="Create Password"
+            type="password"
+            placeholder="********"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          
-          <Button 
-            type="submit" 
-            className="w-full py-3 mt-6 text-base rounded-xl" 
+
+          <Button
+            type="submit"
+            className="w-full py-3 mt-6 text-base rounded-xl"
             loading={loading}
           >
             Create My Second Brain
