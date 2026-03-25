@@ -14,3 +14,13 @@ export const deleteContentApi = async (id) => {
   const response = await apiClient.delete(`/content/delete/${id}`);
   return response.data;
 };
+
+export const uploadContentApi = async (formData) => {
+  const response = await apiClient.post('/content/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+};

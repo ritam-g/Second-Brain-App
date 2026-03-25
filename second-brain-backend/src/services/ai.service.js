@@ -1,6 +1,8 @@
 import { ChatMistralAI } from "@langchain/mistralai"
 
 const maxPromptCharacters = 6000
+const maxDescriptionCharacters = 180
+const maxTitleCharacters = 80
 const maxGeneratedTags = 10
 const stopWords = new Set([
     "about",
@@ -35,23 +37,35 @@ const stopWords = new Set([
 
 let mistralModel = null
 
+// Generates clean title, description, and tags from extracted upload text using LangChain + Mistral.
+// Input: extracted text string and optional metadata such as file name, file type, and fallback values.
+// Output: object containing `title`, `description`, and normalized `tags`.
+export async function generateUploadMetadataFromText(text, context = {}) {
+    const model = getMistralModel()
+    const response = await model.invoke([
+        [
+            "system",
+            "Create clean metadata for uploaded PDFs or images. Return ONLY a JSON object with keys title, description, and tags. Never repeat garbled OCR. If text is unreliable, use the file name and file type to create neutral, readable metadata. Keep title under 80 characters, description under 180 characters, and tags focused and useful.",
+        ],
+        ["human", buildMetadataPromptText(text, context)],
+    ])
+
+    const parsedMetadata = parseMetadataObject(normalizeModelContent(response?.content))
+
+    return {
+        title: normalizeGeneratedText(parsedMetadata?.title, maxTitleCharacters),
+        description: normalizeGeneratedText(parsedMetadata?.description, maxDescriptionCharacters),
+        tags: normalizeTags(Array.isArray(parsedMetadata?.tags) ? parsedMetadata.tags : []),
+    }
+}
+
 // Generates 5-10 relevant tags from extracted content using LangChain + Mistral.
 // Input: extracted text string and optional metadata such as file name and file type.
 // Output: normalized array of tags ready to store in MongoDB.
 export async function generateTagsFromText(text, context = {}) {
-    const model = getMistralModel()
     const fallbackTags = buildFallbackTags(text, context)
-    const promptText = buildPromptText(text, context)
-
-    const response = await model.invoke([
-        [
-            "system",
-            "Extract 5-10 relevant tags from this content. Return ONLY a JSON array of tags.",
-        ],
-        ["human", promptText],
-    ])
-
-    const parsedTags = parseTagArray(normalizeModelContent(response?.content))
+    const metadata = await generateUploadMetadataFromText(text, context)
+    const parsedTags = metadata.tags
 
     if (!parsedTags.length) {
         return fallbackTags
@@ -84,17 +98,20 @@ function getMistralModel() {
     return mistralModel
 }
 
-// Builds a compact prompt so the AI sees the file context plus the most relevant extracted text.
+// Builds a compact metadata prompt so the AI sees the file context, fallback hints, and the cleanest extracted text.
 // Input: extracted text string and metadata object.
 // Output: prompt string to send to the chat model.
-function buildPromptText(text, context) {
+function buildMetadataPromptText(text, context) {
     const normalizedText = String(text || "").trim()
     const clippedText = normalizedText.slice(0, maxPromptCharacters) || "No readable text was extracted from the file."
 
     return [
         `File name: ${context?.fileName || "unknown"}`,
         `File type: ${context?.fileType || "document"}`,
-        "Content:",
+        `Text readable: ${context?.textReadable ? "yes" : "no"}`,
+        `Fallback title: ${context?.fallbackTitle || "Uploaded File"}`,
+        `Fallback description: ${context?.fallbackDescription || "Uploaded file saved to Second Brain."}`,
+        "Extracted content:",
         clippedText,
     ].join("\n\n")
 }
@@ -149,6 +166,29 @@ function parseTagArray(content) {
     return safeParseArray(bracketMatch[0])
 }
 
+// Parses the Mistral response into a metadata object with title, description, and tags.
+// Input: model response text that should contain a JSON object.
+// Output: plain object or an empty object when parsing fails.
+function parseMetadataObject(content) {
+    const cleanContent = String(content || "")
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim()
+
+    const directResult = safeParseObject(cleanContent)
+    if (Object.keys(directResult).length) {
+        return directResult
+    }
+
+    const objectMatch = cleanContent.match(/\{[\s\S]*\}/)
+
+    if (!objectMatch) {
+        return {}
+    }
+
+    return safeParseObject(objectMatch[0])
+}
+
 // Safely parses JSON text and keeps only string array values.
 // Input: JSON string that should represent an array.
 // Output: array of strings or an empty array if parsing fails.
@@ -163,6 +203,23 @@ function safeParseArray(value) {
         return parsed.filter(item => typeof item === "string")
     } catch {
         return []
+    }
+}
+
+// Safely parses JSON text and keeps only plain-object values.
+// Input: JSON string that should represent an object.
+// Output: plain object or an empty object if parsing fails.
+function safeParseObject(value) {
+    try {
+        const parsed = JSON.parse(value)
+
+        if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+            return {}
+        }
+
+        return parsed
+    } catch {
+        return {}
     }
 }
 
@@ -224,4 +281,15 @@ function sanitizeTag(tag) {
         .replace(/[^a-z0-9-]+/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-+|-+$/g, "")
+}
+
+// Normalizes short AI-generated text fields so upload metadata stays readable and compact.
+// Input: raw AI-generated title or description string and a maximum character length.
+// Output: cleaned string clipped to the requested size.
+function normalizeGeneratedText(value, maxLength) {
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^["']+|["']+$/g, "")
+        .slice(0, maxLength)
 }

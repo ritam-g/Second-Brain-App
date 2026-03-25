@@ -1,22 +1,26 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Link as LinkIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { FileImage, FileText, Link as LinkIcon, Search, UploadCloud } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import ContentCard from '../../components/cards/ContentCard';
 import Navbar from '../../components/layout/Navbar';
 import EmptyState from '../../components/ui/EmptyState';
 import Loader from '../../components/ui/Loader';
 import Button from '../../components/ui/Button';
-import { useGetContent, useSaveContent, useFilteredContent } from '../../hooks/useContent';
+import { useGetContent, useSaveContent, useFilteredContent, useUploadContent } from '../../hooks/useContent';
 import { notify } from '../../lib/toast';
 
 const Dashboard = () => {
   const { items, loading, error } = useSelector((state) => state.content);
   const { getContent } = useGetContent();
   const { saveContent, loading: saveLoading } = useSaveContent();
+  const { upload, loading: uploadLoading } = useUploadContent();
 
   const [urlInput, setUrlInput] = useState('');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     getContent();
@@ -40,6 +44,57 @@ const Dashboard = () => {
     const result = await saveContent({ url: normalizedUrl });
     if (result.success) {
       setUrlInput('');
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const nextFile = e.target.files?.[0] || null;
+
+    if (!nextFile) {
+      setSelectedFile(null);
+      return;
+    }
+
+    if (!isSupportedUploadFile(nextFile)) {
+      notify.warning('Choose a PDF or image file to upload.', { toastId: 'upload-file-invalid' });
+      e.target.value = '';
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(nextFile);
+  };
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+
+    if (!selectedFile) {
+      notify.info('Select a PDF or image before uploading.', { toastId: 'upload-file-empty' });
+      return;
+    }
+
+    if (!isSupportedUploadFile(selectedFile)) {
+      notify.warning('Only PDF and image files are supported.', { toastId: 'upload-file-unsupported' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    const normalizedTitle = uploadTitle.trim();
+    if (normalizedTitle) {
+      formData.append('title', normalizedTitle);
+    }
+
+    const result = await upload(formData);
+
+    if (result.success) {
+      setSelectedFile(null);
+      setUploadTitle('');
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -72,35 +127,121 @@ const Dashboard = () => {
               Capture your inspiration.
             </h1>
             <p className="text-lg text-slate-500">
-              Save articles, papers, and ideas to your permanent archive in one click.
+              Save links, PDFs, images, and ideas to your permanent archive in one place.
             </p>
           </div>
         </div>
 
-        <form
-          onSubmit={handleSave}
-          className="max-w-3xl mx-auto mb-16 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-2 focus-within:ring-4 focus-within:ring-primary/20 focus-within:border-primary transition-all"
-        >
-          <div className="pl-4 text-slate-400">
-            <LinkIcon className="w-5 h-5" />
-          </div>
-          <input
-            type="url"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="Paste any URL to save..."
-            className="flex-1 bg-transparent px-2 py-3 outline-none text-slate-700 font-medium"
-            required
-          />
-          <Button
-            type="submit"
-            loading={saveLoading}
-            disabled={loading && items.length === 0}
-            className="px-6 rounded-xl"
+        <div className="grid gap-6 mb-16 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]">
+          <form
+            onSubmit={handleSave}
+            className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
           >
-            Save
-          </Button>
-        </form>
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                <LinkIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-slate-800">Save from a link</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Paste an article, tweet, or resource URL and keep it searchable inside your dashboard.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="Paste any URL to save..."
+                className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/15"
+                required
+              />
+              <Button
+                type="submit"
+                loading={saveLoading}
+                disabled={loading && items.length === 0}
+                className="rounded-2xl px-6 py-3 md:self-stretch"
+              >
+                Save Link
+              </Button>
+            </div>
+          </form>
+
+          <form
+            onSubmit={handleUpload}
+            className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <UploadCloud className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-slate-800">Upload PDF or image</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Add screenshots, scans, PDFs, and notes. The backend will process and tag them automatically.
+                </p>
+              </div>
+            </div>
+
+            <label
+              htmlFor="content-upload"
+              className="mt-6 flex cursor-pointer flex-col gap-3 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 transition-colors hover:border-primary hover:bg-primary/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                  {selectedFile && isPdfFile(selectedFile) ? (
+                    <FileText className="h-5 w-5" />
+                  ) : (
+                    <FileImage className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-700">
+                    {selectedFile ? selectedFile.name : 'Choose a file to upload'}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {selectedFile
+                      ? `${isPdfFile(selectedFile) ? 'PDF document' : 'Image file'} | ${formatFileSize(selectedFile.size)}`
+                      : 'Supports PDF, PNG, JPG, WEBP, GIF, and other image formats.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                Browse files
+              </div>
+            </label>
+
+            <input
+              id="content-upload"
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+
+            <input
+              type="text"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              placeholder="Enter title (optional)"
+              className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/15"
+              maxLength={120}
+            />
+
+            <Button
+              type="submit"
+              loading={uploadLoading}
+              disabled={!selectedFile || (loading && items.length === 0)}
+              className="mt-4 w-full rounded-2xl py-3"
+            >
+              Upload File
+            </Button>
+          </form>
+        </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
           <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto scrollbar-hide">
@@ -147,7 +288,7 @@ const Dashboard = () => {
           <div className="pt-8">
             <EmptyState
               title={searchInput ? 'No results found' : 'Your brain is empty'}
-              description={searchInput ? 'Try adjusting your search query.' : 'Paste a link above to start collecting your digital assets.'}
+              description={searchInput ? 'Try adjusting your search query.' : 'Save a link or upload a file above to start collecting your digital assets.'}
             />
           </div>
         )}
@@ -163,6 +304,38 @@ function isValidHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function isSupportedUploadFile(file) {
+  if (!file) {
+    return false;
+  }
+
+  const normalizedType = String(file.type || '').toLowerCase();
+  const normalizedName = String(file.name || '').toLowerCase();
+
+  return normalizedType === 'application/pdf'
+    || normalizedType.startsWith('image/')
+    || /\.(pdf|png|jpe?g|webp|gif|bmp|svg)$/i.test(normalizedName);
+}
+
+function isPdfFile(file) {
+  const normalizedType = String(file?.type || '').toLowerCase();
+  const normalizedName = String(file?.name || '').toLowerCase();
+
+  return normalizedType === 'application/pdf' || normalizedName.endsWith('.pdf');
+}
+
+function formatFileSize(size) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return 'Unknown size';
+  }
+
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default Dashboard;

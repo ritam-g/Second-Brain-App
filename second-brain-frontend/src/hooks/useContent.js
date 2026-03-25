@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
-import { getContentApi, saveContentApi, deleteContentApi } from '../api/content.api';
+import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi } from '../api/content.api';
 import { getApiErrorMessage } from '../lib/api-error';
 import { notify } from '../lib/toast';
 
@@ -88,6 +88,40 @@ export const useDeleteContent = () => {
   };
 
   return { deleteContent, loading };
+};
+
+export const useUploadContent = () => {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+
+  const upload = async (formData) => {
+    setLoading(true);
+    dispatch(setContentLoading(true));
+    try {
+      const response = await notify.promise(
+        uploadContentApi(formData),
+        {
+          pending: 'Uploading file to your library...',
+          success: () => 'File uploaded successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to upload file'),
+        },
+        { toastId: 'upload-content-request' },
+      );
+      const payload = response.data !== undefined ? response.data : response;
+      if (payload) {
+        dispatch(addContentItem(payload));
+      }
+      return { success: true, data: payload };
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Failed to upload file');
+      dispatch(setContentError(message));
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { upload, loading };
 };
 
 /**

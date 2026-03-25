@@ -45,10 +45,10 @@ export function detectUploadFileType(file) {
     return null
 }
 
-// Extracts plain text from a PDF or image upload.
+// Extracts file text plus OCR confidence metadata for downstream title/description generation.
 // Input: multer file object containing `buffer`, `mimetype`, and `originalname`.
-// Output: normalized extracted text string.
-export async function extractText(file) {
+// Output: object with normalized `text`, numeric `ocrConfidence`, and detected `fileType`.
+export async function extractFileContent(file) {
     const fileType = detectUploadFileType(file)
 
     if (!fileType) {
@@ -56,21 +56,40 @@ export async function extractText(file) {
     }
 
     if (fileType === "pdf") {
-        return extractPdfText(file.buffer)
+        const pdfContent = await extractPdfContent(file.buffer)
+        return {
+            ...pdfContent,
+            fileType,
+        }
     }
 
-    return extractImageText(file.buffer)
+    const imageContent = await extractImageContent(file.buffer)
+    return {
+        ...imageContent,
+        fileType,
+    }
+}
+
+// Extracts plain text from a PDF or image upload.
+// Input: multer file object containing `buffer`, `mimetype`, and `originalname`.
+// Output: normalized extracted text string.
+export async function extractText(file) {
+    const extractedContent = await extractFileContent(file)
+    return extractedContent.text
 }
 
 // Extracts text from a PDF buffer using pdf-parse.
 // Input: raw PDF buffer from multer memory storage.
-// Output: normalized text content extracted from the PDF.
-async function extractPdfText(buffer) {
+// Output: object with normalized text and a null OCR confidence value.
+async function extractPdfContent(buffer) {
     const parser = new PDFParse({ data: buffer })
 
     try {
         const result = await parser.getText()
-        return normalizeExtractedText(result?.text || "")
+        return {
+            text: normalizeExtractedText(result?.text || ""),
+            ocrConfidence: null,
+        }
     } finally {
         await parser.destroy()
     }
@@ -78,13 +97,16 @@ async function extractPdfText(buffer) {
 
 // Extracts text from an image buffer using Tesseract OCR.
 // Input: raw image buffer from multer memory storage.
-// Output: normalized OCR text string.
-async function extractImageText(buffer) {
+// Output: object with normalized text and OCR confidence from Tesseract when available.
+async function extractImageContent(buffer) {
     const worker = await createWorker("eng")
 
     try {
         const result = await worker.recognize(buffer)
-        return normalizeExtractedText(result?.data?.text || "")
+        return {
+            text: normalizeExtractedText(result?.data?.text || ""),
+            ocrConfidence: normalizeOcrConfidence(result?.data?.confidence),
+        }
     } finally {
         await worker.terminate()
     }
@@ -100,6 +122,19 @@ function normalizeExtractedText(text) {
         .replace(/[ \t]+/g, " ")
         .replace(/\n{3,}/g, "\n\n")
         .trim()
+}
+
+// Normalizes Tesseract confidence values into a stable 0-100 integer.
+// Input: numeric or string OCR confidence returned by Tesseract.
+// Output: rounded confidence integer or `null` when no valid confidence exists.
+function normalizeOcrConfidence(confidence) {
+    const numericConfidence = Number(confidence)
+
+    if (!Number.isFinite(numericConfidence)) {
+        return null
+    }
+
+    return Math.max(0, Math.min(100, Math.round(numericConfidence)))
 }
 
 // Extracts the lowercase file extension from the uploaded filename.

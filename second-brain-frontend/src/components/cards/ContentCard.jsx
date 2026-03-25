@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import TagBadge from '../ui/TagBadge';
-import { ExternalLink, ImageOff, Trash2 } from 'lucide-react';
+import { ExternalLink, FileText, ImageOff, Trash2 } from 'lucide-react';
 import { useDeleteContent } from '../../hooks/useContent';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -9,11 +9,18 @@ const ContentCard = ({ content }) => {
   const { _id, title, description, image, url, tags, type, siteName, createdAt } = content;
   const { deleteContent, loading } = useDeleteContent();
   const [imageFailed, setImageFailed] = useState(false);
+  const normalizedType = String(type || '').toLowerCase();
+  const destinationUrl = String(url || image || '').trim();
+  const isPdfContent = normalizedType === 'pdf' || isPdfUrl(destinationUrl);
+  const isDocumentContent = normalizedType === 'document' || isPdfContent;
+  const isUploadedImage = normalizedType === 'image';
   const platformLabel = getPlatformLabel(url, type, siteName);
-  const displayTitle = getDisplayTitle(url, title, description);
+  const displayTitle = getDisplayTitle(url, title, description, type);
   const displayTags = getDisplayTags(tags);
   const previewLabel = getPreviewLabel(platformLabel, type);
-  const previewImage = getPreviewImageUrl(image, url);
+  const previewImage = isUploadedImage
+    ? String(image || url || '').trim()
+    : getPreviewImageUrl(image, url);
 
   useEffect(() => {
     setImageFailed(false);
@@ -26,13 +33,54 @@ const ContentCard = ({ content }) => {
     }
   };
 
-  const showImage = Boolean(previewImage) && !imageFailed;
+  const showImage = !isDocumentContent && Boolean(previewImage) && !imageFailed;
 
   return (
     <div className="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:-translate-y-1">
       {/* Image section */}
-      {showImage ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
+      {isPdfContent ? (
+        <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
+          {destinationUrl ? (
+            <iframe
+              src={getPdfPreviewUrl(destinationUrl)}
+              title={displayTitle}
+              className="h-full w-full border-0 bg-white"
+              loading="lazy"
+            />
+          ) : null}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm">
+                <FileText className="w-3.5 h-3.5" />
+                PDF
+              </span>
+              <p className="mt-3 text-sm font-medium text-white line-clamp-2">
+                Open the document to read the full file.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : isDocumentContent ? (
+        <div className="aspect-video w-full relative overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.7),_transparent_45%)]" />
+          <div className="absolute inset-0 flex flex-col justify-between p-5">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm">
+              <FileText className="w-3.5 h-3.5" />
+              Document
+            </span>
+            <div>
+              <p className="max-w-[16rem] text-base font-semibold text-slate-700 line-clamp-2">
+                Uploaded document ready to open.
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Use the open action below to view the original file.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : showImage ? (
+        <a href={destinationUrl} target="_blank" rel="noopener noreferrer" className="aspect-video w-full overflow-hidden bg-slate-100 relative block">
           <img
             src={previewImage}
             alt={displayTitle}
@@ -43,7 +91,7 @@ const ContentCard = ({ content }) => {
         </a>
       ) : (
         <a
-          href={url}
+          href={destinationUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="aspect-video w-full relative block overflow-hidden bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300"
@@ -71,7 +119,7 @@ const ContentCard = ({ content }) => {
           )}
         </div>
 
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-slate-800 leading-snug mb-2 line-clamp-2 hover:text-primary transition-colors" title={displayTitle}>
+        <a href={destinationUrl} target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-slate-800 leading-snug mb-2 line-clamp-2 hover:text-primary transition-colors" title={displayTitle}>
           {displayTitle}
         </a>
 
@@ -104,7 +152,7 @@ const ContentCard = ({ content }) => {
               <Trash2 className="w-4 h-4" />
             </button>
             <a
-              href={url}
+              href={destinationUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:text-primary-dark p-2 hover:bg-slate-50 rounded-full transition-colors"
@@ -121,7 +169,20 @@ const ContentCard = ({ content }) => {
 
 function getPlatformLabel(url, type, siteName) {
   const normalizedUrl = String(url || '').toLowerCase();
+  const normalizedType = String(type || '').toLowerCase();
   const normalizedSiteName = String(siteName || '').toLowerCase();
+
+  if (normalizedType === 'image') {
+    return 'image';
+  }
+
+  if (normalizedType === 'document') {
+    return isPdfUrl(normalizedUrl) ? 'pdf' : 'document';
+  }
+
+  if (normalizedType === 'pdf') {
+    return 'pdf';
+  }
 
   if (normalizedUrl.includes('linkedin.com') || normalizedSiteName.includes('linkedin')) {
     return 'linkedin';
@@ -139,10 +200,10 @@ function getPlatformLabel(url, type, siteName) {
     return type === 'tweet' ? 'tweet' : 'twitter';
   }
 
-  return type || siteName || 'web';
+  return normalizedType || siteName || 'web';
 }
 
-function getDisplayTitle(url, title, description) {
+function getDisplayTitle(url, title, description, type) {
   const normalizedUrl = String(url || '').toLowerCase();
   const trimmedTitle = String(title || '').trim();
 
@@ -162,7 +223,19 @@ function getDisplayTitle(url, title, description) {
     }
   }
 
-  return trimmedTitle || 'Untitled';
+  if (trimmedTitle) {
+    return trimmedTitle;
+  }
+
+  if (String(type || '').toLowerCase() === 'image') {
+    return 'Uploaded image';
+  }
+
+  if (String(type || '').toLowerCase() === 'document' || isPdfUrl(normalizedUrl)) {
+    return 'Uploaded document';
+  }
+
+  return 'Untitled';
 }
 
 function getDisplayTags(tags) {
@@ -206,6 +279,16 @@ function getPreviewImageUrl(imageUrl, sourceUrl) {
   return `${normalizedApiUrl}/content/image-proxy?${params.toString()}`;
 }
 
+function getPdfPreviewUrl(url) {
+  const normalizedUrl = String(url || '').trim();
+
+  if (!normalizedUrl) {
+    return '';
+  }
+
+  return `${normalizedUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+}
+
 function extractTwitterUsername(url) {
   try {
     const segments = new URL(url).pathname.split('/').filter(Boolean);
@@ -223,6 +306,10 @@ function extractTwitterUsername(url) {
 
 function isStatusId(value) {
   return /^\d{8,}$/.test(String(value || '').trim());
+}
+
+function isPdfUrl(url) {
+  return /\.pdf(?:$|[?#])/i.test(String(url || '').trim());
 }
 
 export default ContentCard;

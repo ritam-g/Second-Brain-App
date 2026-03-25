@@ -1,7 +1,7 @@
 import contentModel from "../models/content.model.js"
-import { generateTagsFromText } from "../services/ai.service.js"
-import { detectUploadFileType, extractText } from "../services/extract.service.js"
+import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
+import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
 import { uploadFileToImageKit } from "../services/upload.service.js"
 
 // Saves URL-based content by scraping metadata from the target page.
@@ -57,7 +57,7 @@ export async function uploadContentController(req, res) {
             return res.status(400).json({ message: "Only PDF or image files are supported" })
         }
 
-        const extractedText = await extractText(file)
+        const extractedFileContent = await extractFileContent(file)
         const uploadedFile = await uploadFileToImageKit(file, {
             userId: req.user.id,
             uploadType,
@@ -67,21 +67,21 @@ export async function uploadContentController(req, res) {
             throw new Error("ImageKit did not return a public file URL")
         }
 
-        const aiTags = await generateTagsFromText(
-            buildAiInputText(extractedText, file.originalname, uploadType),
-            {
-                fileName: file.originalname,
-                fileType: uploadType,
-            },
-        )
+        const uploadMetadata = await resolveUploadMetadata({
+            manualTitle: req.body?.title,
+            originalName: file.originalname,
+            uploadType,
+            extractedText: extractedFileContent.text,
+            ocrConfidence: extractedFileContent.ocrConfidence,
+        })
 
         const content = await contentModel.create({
             userId: req.user.id,
-            title: resolveUploadedTitle(req.body?.title, extractedText, file.originalname),
-            description: buildUploadedDescription(extractedText, uploadType),
+            title: uploadMetadata.title,
+            description: uploadMetadata.description,
             image: uploadType === "image" ? uploadedFile.url : uploadedFile.thumbnailUrl || "",
-            tags: buildSavedTags(aiTags, uploadType, file.originalname),
-            type: uploadType === "image" ? "image" : "document",
+            tags: uploadMetadata.tags,
+            type: uploadType,
             url: uploadedFile.url,
         })
 
@@ -248,104 +248,6 @@ export async function proxyContentImageController(req, res) {
             message: "Failed to load image preview",
         })
     }
-}
-
-// Builds the text sent into the AI model, even when OCR/PDF extraction is sparse.
-// Input: extracted text string, original filename, and detected upload type.
-// Output: prompt-ready text string.
-function buildAiInputText(extractedText, originalName, uploadType) {
-    const normalizedText = String(extractedText || "").trim()
-
-    if (normalizedText) {
-        return normalizedText
-    }
-
-    return `File name: ${stripFileExtension(originalName)}\nFile type: ${uploadType}\nUploaded file for Second Brain knowledge storage.`
-}
-
-// Resolves a stable title for uploaded content.
-// Input: optional manual title, extracted text, and original filename.
-// Output: string title suitable for saving in MongoDB.
-function resolveUploadedTitle(manualTitle, extractedText, originalName) {
-    const cleanedManualTitle = normalizeSingleLine(manualTitle)
-    if (cleanedManualTitle) {
-        return cleanedManualTitle
-    }
-
-    const extractedTitle = String(extractedText || "")
-        .split("\n")
-        .map(line => normalizeSingleLine(line))
-        .find(Boolean)
-
-    if (extractedTitle) {
-        return extractedTitle.slice(0, 120)
-    }
-
-    return normalizeSingleLine(stripFileExtension(originalName)) || "Uploaded File"
-}
-
-// Builds the short content description stored alongside the uploaded file.
-// Input: extracted text string and detected upload type.
-// Output: short description string capped for card previews.
-function buildUploadedDescription(extractedText, uploadType) {
-    const normalizedText = String(extractedText || "").trim()
-
-    if (normalizedText) {
-        return normalizedText.slice(0, 200)
-    }
-
-    return uploadType === "image"
-        ? "Image upload saved to Second Brain."
-        : "Document upload saved to Second Brain."
-}
-
-// Merges AI tags with file-derived tags so saved uploads stay searchable even when the model is sparse.
-// Input: AI-generated tag array, detected upload type, and original filename.
-// Output: deduplicated array of tags ready for MongoDB.
-function buildSavedTags(aiTags, uploadType, originalName) {
-    const fileNameTags = stripFileExtension(originalName)
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter(tag => tag.length > 2)
-
-    const tags = [
-        ...aiTags,
-        uploadType,
-        "upload",
-        ...fileNameTags,
-    ]
-
-    return [...new Set(tags.map(normalizeTag).filter(Boolean))].slice(0, 10)
-}
-
-// Normalizes user-facing titles and filenames onto a single line.
-// Input: raw string value.
-// Output: compact single-line string.
-function normalizeSingleLine(value) {
-    return String(value || "")
-        .replace(/\s+/g, " ")
-        .trim()
-}
-
-// Removes the file extension so uploaded file names can become readable titles and tags.
-// Input: original filename string.
-// Output: filename without the last extension segment.
-function stripFileExtension(fileName) {
-    const normalizedFileName = String(fileName || "").trim()
-    return normalizedFileName.replace(/\.[^.]+$/, "")
-}
-
-// Sanitizes tags before they are stored in MongoDB.
-// Input: raw tag string.
-// Output: lowercase tag or an empty string.
-function normalizeTag(tag) {
-    return String(tag || "")
-        .toLowerCase()
-        .trim()
-        .replace(/^#+/, "")
-        .replace(/[^a-z0-9-]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "")
 }
 
 // Resolves a safe referer header for the image proxy fetch request.
