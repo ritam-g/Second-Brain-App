@@ -26,9 +26,10 @@ import {
   getPreviewSource,
   getRelativeTime,
   getSourceLabel,
-} from './contentCard.utils';
+  getPreviewType,
+  getFallbackImage,
+} from './utils';
 import { useDeleteContent } from '../../hooks/useContent';
-import { getFallbackImage, getPreviewType } from '../../utils/previewHelper';
 
 // Preview-first content card used in the dashboard masonry grid.
 // Input: saved content item and its masonry index.
