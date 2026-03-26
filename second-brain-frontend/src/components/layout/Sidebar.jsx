@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   PanelLeftClose,
   Settings,
+  Share2,
   Sparkles,
   Wifi,
   X,
@@ -17,6 +18,7 @@ import {
 import Button from '../ui/Button';
 
 const navigationItems = [
+  { label: 'Knowledge Graph', icon: Share2, path: '/graph' },
   { label: 'Library', icon: BookOpenText, path: '/dashboard' },
   { label: 'Deep Focus', icon: BrainCircuit, path: '/deep-focus' },
   { label: 'Recent Discoveries', icon: Compass },
