@@ -17,13 +17,14 @@ const placeholderTitles = new Set(['no title', 'untitled archive', 'untitled doc
 // Input: saved content item from Redux.
 // Output: normalized kind string for card presentation.
 export function getContentKind(content) {
+  const normalizedType = String(content?.type || '').toLowerCase();
   const previewType = getPreviewType(content);
 
-  if (previewType === 'image') {
+  if (normalizedType === 'image' || previewType === 'image') {
     return 'image';
   }
 
-  if (previewType === 'pdf') {
+  if (normalizedType === 'pdf' || normalizedType === 'document' || previewType === 'pdf') {
     return 'document';
   }
 
@@ -31,11 +32,41 @@ export function getContentKind(content) {
     return 'video';
   }
 
+  if (normalizedType === 'social') {
+    return 'social';
+  }
+
   if (['instagram', 'linkedin', 'twitter'].includes(previewType)) {
     return 'social';
   }
 
   return 'article';
+}
+
+// Returns the short type badge shown on each card.
+// Input: content item.
+// Output: compact badge label.
+export function getTypeBadge(content) {
+  const kind = getContentKind(content);
+  const previewType = getPreviewType(content);
+
+  if (kind === 'document') {
+    return 'PDF';
+  }
+
+  if (kind === 'image') {
+    return 'IMAGE';
+  }
+
+  if (kind === 'video') {
+    return 'VIDEO';
+  }
+
+  if (['instagram', 'linkedin', 'twitter'].includes(previewType) || kind === 'social') {
+    return 'SOCIAL';
+  }
+
+  return 'ARTICLE';
 }
 
 // Chooses a visual card variant while keeping every card preview-first.
@@ -145,7 +176,7 @@ export function getFooterMeta(content) {
   }
 
   if (kind === 'image') {
-    return `${Math.max(tags.length, 1)} visual tag${tags.length === 1 ? '' : 's'}`;
+    return 'Open image';
   }
 
   if (kind === 'social') {
@@ -191,6 +222,7 @@ export function getSourceLabel(content) {
     linkedin: 'linkedin',
     twitter: 'x / twitter',
     pdf: 'pdf document',
+    image: 'image upload',
   };
 
   if (previewLabels[previewType]) {

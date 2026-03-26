@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
-import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi } from '../api/content.api';
+import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi, semanticSearchContentApi } from '../api/content.api';
 import { getApiErrorMessage } from '../lib/api-error';
 import { notify } from '../lib/toast';
 
@@ -124,6 +124,29 @@ export const useUploadContent = () => {
   return { upload, loading };
 };
 
+export const useSemanticSearchContent = () => {
+  const [loading, setLoading] = useState(false);
+
+  const searchContent = useCallback(async (payload) => {
+    setLoading(true);
+
+    try {
+      // Semantic search is tied to the dashboard search box, so we avoid toast spam while users type.
+      const response = await semanticSearchContentApi(payload);
+
+      const results = response.data !== undefined ? response.data : response;
+      return { success: true, data: results || [] };
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Failed to search content');
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { searchContent, loading };
+};
+
 /**
  * REASONING FOR `useFilteredContent`:
  *
@@ -184,6 +207,14 @@ export const useFilteredContent = (content, filters = {}) => {
 function resolveDashboardCategory(item) {
   const normalizedType = String(item?.type || '').toLowerCase();
   const normalizedUrl = String(item?.url || '').toLowerCase();
+
+  if (normalizedType === 'pdf' || normalizedType === 'document' || normalizedUrl.includes('.pdf')) {
+    return 'Documents';
+  }
+
+  if (normalizedType === 'image' || /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|[?#])/i.test(normalizedUrl)) {
+    return 'Images';
+  }
 
   if (normalizedType === 'youtube' || normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be')) {
     return 'Video';

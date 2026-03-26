@@ -24,3 +24,13 @@ export const uploadContentApi = async (formData) => {
 
   return response.data;
 };
+
+// Alias that matches the newer backend/frontend naming without breaking existing imports.
+export const uploadContent = uploadContentApi;
+
+export const semanticSearchContentApi = async (payload) => {
+  const response = await apiClient.post('/search/semantic', payload);
+  return response.data;
+};
+
+export const semanticSearchContent = semanticSearchContentApi;

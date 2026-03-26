@@ -98,6 +98,10 @@ export function getPreviewType(content) {
     return 'linkedin';
   }
 
+  if (normalizedType === 'social') {
+    return 'article';
+  }
+
   if (
     ['tweet', 'x', 'twitter'].includes(normalizedType)
     || normalizedUrl.includes('twitter.com')
@@ -131,7 +135,10 @@ export function getPreviewImage(data) {
   }
 
   if (previewType === 'pdf') {
-    return getFallbackImage('pdf');
+    // PDFs now come back with an optional thumbnail in `image`.
+    // Use that when available, and fall back to the branded PDF cover otherwise.
+    const pdfPreview = routePreviewImage(normalizedImage, destinationUrl);
+    return pdfPreview || getFallbackImage('pdf');
   }
 
   if (normalizedImage) {

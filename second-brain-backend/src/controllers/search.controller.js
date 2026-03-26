@@ -8,7 +8,7 @@ const searchFanoutMultiplier = 3
 
 // Converts a semantic query into an embedding, searches Pinecone, and hydrates the hits from MongoDB.
 // Input: request body with `query` and optional `topK`, plus authenticated `req.user.id`.
-// Output: enriched search matches containing Mongo content fields and Pinecone scores.
+// Output: ordered Mongo content documents enriched with semantic match metadata.
 export async function semanticSearchController(req, res) {
     try {
         // Read and validate the natural-language query from the client.
@@ -35,8 +35,8 @@ export async function semanticSearchController(req, res) {
             topK: topK * searchFanoutMultiplier,
         })
 
-        // Replace raw vector hits with real Mongo content cards.
-        const enrichedMatches = await hydrateMongoMatches({
+        // Replace raw Pinecone chunk hits with full Mongo content documents.
+        const contents = await hydrateMongoMatches({
             matches: pineconeMatches,
             userId,
             limit: topK,
@@ -44,7 +44,7 @@ export async function semanticSearchController(req, res) {
 
         return res.status(200).json({
             success: true,
-            data: enrichedMatches,
+            data: contents,
         })
     } catch (error) {
         console.error("Semantic Search Error:", error.message)
@@ -61,7 +61,7 @@ export const semanticSearch = semanticSearchController
 
 // Fetches Mongo content docs for Pinecone hits and preserves the match ordering.
 // Input: Pinecone match list, authenticated user id, and final result limit.
-// Output: deduplicated, enriched response objects.
+// Output: deduplicated Mongo content documents enriched with score metadata.
 async function hydrateMongoMatches({ matches, userId, limit }) {
     if (!Array.isArray(matches) || !matches.length) {
         return []
@@ -83,6 +83,7 @@ async function hydrateMongoMatches({ matches, userId, limit }) {
         userId,
         vectorReady: true,
         $or: [
+            { _id: { $in: contentIdsFromMetadata } },
             { contentId: { $in: contentIdsFromMetadata } },
             { vectorIds: { $in: vectorIds } },
             { contentId: { $in: vectorIds } },
@@ -109,7 +110,7 @@ async function hydrateMongoMatches({ matches, userId, limit }) {
         })
     })
 
-    const enrichedMatches = []
+    const hydratedContents = []
     const seenContentIds = new Set()
 
     for (const match of matches) {
@@ -133,22 +134,20 @@ async function hydrateMongoMatches({ matches, userId, limit }) {
 
         // Avoid returning the same content multiple times when many chunks match the same document.
         seenContentIds.add(resolvedContentId)
-        enrichedMatches.push({
+        hydratedContents.push({
+            ...document,
             contentId: resolvedContentId,
-            title: document.title,
-            image: document.image || "",
-            tags: Array.isArray(document.tags) ? document.tags : [],
             description: document.description || document.summary || "",
-            score: Number.isFinite(match?.score) ? match.score : null,
-            vectorId,
+            matchScore: Number.isFinite(match?.score) ? match.score : null,
+            matchedVectorId: vectorId,
         })
 
-        if (enrichedMatches.length >= limit) {
+        if (hydratedContents.length >= limit) {
             break
         }
     }
 
-    return enrichedMatches
+    return hydratedContents
 }
 
 // Constrains requested topK values to keep query cost and payload size predictable.

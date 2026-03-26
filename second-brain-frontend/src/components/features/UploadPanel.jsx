@@ -19,7 +19,7 @@ const UploadPanel = ({
   const isPdf = isPdfFile(selectedFile);
   const fileMeta = selectedFile
     ? `${isPdf ? 'PDF' : 'Image'} | ${formatFileSize(selectedFile.size)}`
-    : 'PDF, Markdown, or Images';
+    : 'PDF or image with AI tags and preview';
 
   return (
     <GlassCard interactive className="p-5 sm:p-6">
@@ -56,7 +56,7 @@ const UploadPanel = ({
                 {selectedFile ? selectedFile.name : 'Select a file to upload'}
               </p>
               <p className="text-xs text-obsidian-500">
-                {selectedFile ? fileMeta : 'Choose PDF or image and let AI organize it.'}
+                {selectedFile ? fileMeta : 'Choose a PDF or image and let the backend extract, tag, and store it.'}
               </p>
             </div>
           </div>

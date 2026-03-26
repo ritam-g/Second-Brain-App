@@ -23,6 +23,7 @@ import {
   getDisplayTitle,
   getDocumentChecklist,
   getFooterMeta,
+  getTypeBadge,
   getPreviewSource,
   getRelativeTime,
   getSourceLabel,
@@ -45,18 +46,19 @@ const ContentCard = ({ content, index }) => {
   const displayDescription = getDisplayDescription(content);
   const displayTags = getDisplayTags(content);
   const cardLabel = getCardLabel(content);
+  const typeBadge = getTypeBadge(content);
   const relativeTime = getRelativeTime(content);
   const footerMeta = getFooterMeta(content);
   const sourceLabel = getSourceLabel(content);
   const checklistItems = useMemo(() => getDocumentChecklist(content), [content]);
   const fallbackPreviewSource = useMemo(() => getFallbackImage(previewType), [previewType]);
   const [previewSource, setPreviewSource] = useState(basePreviewSource);
-  const [previewLoaded, setPreviewLoaded] = useState(previewType === 'pdf' || basePreviewSource.startsWith('data:image/'));
+  const [previewLoaded, setPreviewLoaded] = useState(previewLoadsInstantly(basePreviewSource));
 
   useEffect(() => {
     setPreviewSource(basePreviewSource);
-    setPreviewLoaded(previewType === 'pdf' || basePreviewSource.startsWith('data:image/'));
-  }, [basePreviewSource, previewType]);
+    setPreviewLoaded(previewLoadsInstantly(basePreviewSource));
+  }, [basePreviewSource]);
 
   const handleDelete = async (event) => {
     event.preventDefault();
@@ -78,6 +80,16 @@ const ContentCard = ({ content, index }) => {
 
   return (
     <GlassCard interactive className="group relative overflow-hidden">
+      {destinationUrl && destinationUrl !== '#' ? (
+        <a
+          href={destinationUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open ${displayTitle}`}
+          className="absolute inset-0 z-10 rounded-[28px]"
+        />
+      ) : null}
+
       <CardOverlayActions href={destinationUrl} onDelete={handleDelete} loading={loading} />
 
       <CardPreview
@@ -95,9 +107,14 @@ const ContentCard = ({ content, index }) => {
       <div className="p-5">
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 truncate text-[11px] uppercase tracking-[0.18em] text-obsidian-500">{sourceLabel}</p>
-          <span className="max-w-[42%] truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-obsidian-500">
-            {variant === 'collection' ? 'Visual Set' : cardLabel}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-[rgba(255,204,102,0.12)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-soft">
+              {typeBadge}
+            </span>
+            <span className="max-w-[42%] truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-obsidian-500">
+              {variant === 'collection' ? 'Visual Set' : cardLabel}
+            </span>
+          </div>
         </div>
 
         <h3
@@ -149,7 +166,7 @@ function CardPreview({
   onLoad,
   onError,
 }) {
-  if (previewType === 'pdf') {
+  if (previewType === 'pdf' && isGeneratedPreview(previewSource)) {
     return (
       <PdfPreview
         title={title}
@@ -160,6 +177,7 @@ function CardPreview({
   }
 
   const AccentIcon = getPreviewAccentIcon(previewType, variant);
+  const previewAlt = previewType === 'pdf' ? `${title} PDF preview` : title;
 
   return (
     <div className="relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]">
@@ -169,7 +187,7 @@ function CardPreview({
 
       <img
         src={previewSource}
-        alt={title}
+        alt={previewAlt}
         loading="lazy"
         onLoad={onLoad}
         onError={onError}
@@ -181,6 +199,13 @@ function CardPreview({
 
       <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,9,8,0.9)] via-[rgba(12,9,8,0.18)] to-transparent" />
       <PreviewBadge label={label} />
+
+      {previewType === 'pdf' ? (
+        <div className="absolute right-5 top-5 inline-flex items-center gap-2 rounded-full border border-[rgba(255,241,214,0.14)] bg-[rgba(12,9,8,0.64)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#fff3db] backdrop-blur-xl">
+          <FileText className="h-3.5 w-3.5 text-accent" />
+          Open PDF
+        </div>
+      ) : null}
 
       <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
         <div className="min-w-0 max-w-[78%]">
@@ -221,7 +246,7 @@ function PdfPreview({ title, label, sourceLabel }) {
           <h3 className="mt-2 text-xl font-bold leading-tight text-[#fff3db]" style={getLineClampStyle(2)}>{title}</h3>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[rgba(255,241,214,0.14)] bg-[rgba(12,9,8,0.34)] px-3 py-1.5 text-xs font-semibold text-[#fff3db]">
             <FileText className="h-3.5 w-3.5 text-accent" />
-            PDF preview card
+            Open PDF document
           </div>
         </div>
       </div>
@@ -281,6 +306,14 @@ function getLineClampStyle(lines) {
     WebkitLineClamp: lines,
     overflow: 'hidden',
   };
+}
+
+function previewLoadsInstantly(source) {
+  return isGeneratedPreview(source);
+}
+
+function isGeneratedPreview(source) {
+  return String(source || '').startsWith('data:image/');
 }
 
 export default ContentCard;

@@ -9,11 +9,12 @@ import ContentCard from '../../components/content/ContentCard';
 import TagChip from '../../components/content/TagChip';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
-import { useGetContent, useSaveContent, useFilteredContent, useUploadContent } from '../../hooks/useContent';
+import { useGetContent, useSaveContent, useFilteredContent, useSemanticSearchContent, useUploadContent } from '../../hooks/useContent';
 import { useLogout } from '../../hooks/useAuth';
 import { notify } from '../../lib/toast';
 
-const dashboardCategories = ['All', 'Links', 'Video', 'Social'];
+const dashboardCategories = ['All', 'Links', 'Documents', 'Images', 'Video', 'Social'];
+const semanticSearchDebounceMs = 350
 
 const Dashboard = () => {
   const { user } = useSelector((state) => state.auth);
@@ -21,22 +22,76 @@ const Dashboard = () => {
   const { getContent } = useGetContent();
   const { saveContent, loading: saveLoading } = useSaveContent();
   const { upload, loading: uploadLoading } = useUploadContent();
+  const { searchContent, loading: semanticSearchLoading } = useSemanticSearchContent();
   const { performLogout, loading: logoutLoading } = useLogout();
 
   const [urlInput, setUrlInput] = useState('');
   const [uploadTitle, setUploadTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearchInput, setDebouncedSearchInput] = useState('');
+  const [semanticResults, setSemanticResults] = useState([]);
+  const [semanticError, setSemanticError] = useState('');
+  const [semanticRetryToken, setSemanticRetryToken] = useState(0);
   const [selectedTag, setSelectedTag] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const saveInputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const searchRequestSequence = useRef(0);
 
   useEffect(() => {
     getContent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchInput(searchInput.trim());
+    }, semanticSearchDebounceMs);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!debouncedSearchInput) {
+      setSemanticResults([]);
+      setSemanticError('');
+      return;
+    }
+
+    const requestId = searchRequestSequence.current + 1;
+    searchRequestSequence.current = requestId;
+    let isCancelled = false;
+
+    async function runSemanticSearch() {
+      const result = await searchContent({
+        query: debouncedSearchInput,
+        topK: 12,
+      });
+
+      if (isCancelled || requestId !== searchRequestSequence.current) {
+        return;
+      }
+
+      if (result.success) {
+        setSemanticResults(Array.isArray(result.data) ? result.data : []);
+        setSemanticError('');
+        return;
+      }
+
+      setSemanticResults([]);
+      setSemanticError(result.error || 'Semantic search failed.');
+    }
+
+    runSemanticSearch();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [debouncedSearchInput, semanticRetryToken, searchContent]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -105,10 +160,16 @@ const Dashboard = () => {
     }
   };
 
+  const normalizedSearchQuery = searchInput.trim();
+  const semanticSearchActive = Boolean(normalizedSearchQuery);
+  const semanticSearchPending = semanticSearchActive && (semanticSearchLoading || debouncedSearchInput !== normalizedSearchQuery);
+  const searchSourceItems = semanticSearchActive ? semanticResults : items;
+  const activeError = semanticSearchActive ? semanticError : error;
+
   const allTags = useMemo(() => {
     const tags = new Set(['All']);
 
-    items.forEach((item) => {
+    searchSourceItems.forEach((item) => {
       (item.tags || []).forEach((tag) => {
         const normalizedTag = String(tag || '').toLowerCase().trim();
 
@@ -119,15 +180,22 @@ const Dashboard = () => {
     });
 
     return Array.from(tags).slice(0, 12);
-  }, [items]);
+  }, [searchSourceItems]);
 
-  const { filteredContent: filteredItems } = useFilteredContent(items, {
-    searchTerm: searchInput,
+  const { filteredContent: filteredItems } = useFilteredContent(searchSourceItems, {
+    // Once semantic search results are loaded, tag/category filters still run locally,
+    // but the text query should no longer fall back to basic title filtering.
+    searchTerm: semanticSearchActive ? '' : searchInput,
     selectedTag,
     selectedCategory,
   });
 
   const hasInitialLoadingState = loading && !items.length;
+  const semanticSearchEmpty = semanticSearchActive && !semanticSearchPending && !semanticResults.length && !semanticError;
+  const gridLoading = hasInitialLoadingState || (semanticSearchPending && !semanticResults.length);
+  const retrySemanticSearch = () => {
+    setSemanticRetryToken((currentValue) => currentValue + 1);
+  };
 
   return (
     <MainLayout
@@ -173,13 +241,19 @@ const Dashboard = () => {
                 Knowledge Canvas
               </h1>
               <p className="pb-1 text-sm text-obsidian-500">
-                showing {filteredItems.length} of {items.length} entries
+                showing {filteredItems.length} of {searchSourceItems.length} {semanticSearchActive ? 'semantic matches' : 'entries'}
               </p>
             </div>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-obsidian-400">
               Save links, documents, and visual references into one curation surface. Search fast, filter by intent, and revisit the right artifact when context matters.
             </p>
+
+            {semanticSearchActive ? (
+              <p className="mt-3 text-xs uppercase tracking-[0.18em] text-accent-soft">
+                Semantic search active for "{normalizedSearchQuery}"
+              </p>
+            ) : null}
           </div>
 
           <div className="obsidian-scroll flex gap-2 overflow-x-auto pb-1">
@@ -194,14 +268,14 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {error && items.length > 0 ? (
+        {activeError && searchSourceItems.length > 0 ? (
           <GlassCard className="mt-6 flex flex-col gap-4 px-5 py-4 text-sm text-obsidian-400 sm:flex-row sm:items-center sm:justify-between">
-            <p>{typeof error === 'string' ? error : 'Something went wrong while refreshing your archive.'}</p>
+            <p>{typeof activeError === 'string' ? activeError : 'Something went wrong while refreshing your archive.'}</p>
             <Button
               type="button"
               variant="surface"
               leadingIcon={<RefreshCcw className="h-4 w-4" />}
-              onClick={getContent}
+              onClick={semanticSearchActive ? retrySemanticSearch : getContent}
             >
               Retry
             </Button>
@@ -209,16 +283,22 @@ const Dashboard = () => {
         ) : null}
 
         <div className="mt-8">
-          {error && !items.length ? (
-            <DashboardErrorState onRetry={getContent} message={error} />
-          ) : filteredItems.length > 0 || hasInitialLoadingState ? (
+          {activeError && !searchSourceItems.length ? (
+            <DashboardErrorState
+              onRetry={semanticSearchActive ? retrySemanticSearch : getContent}
+              message={activeError}
+            />
+          ) : filteredItems.length > 0 || gridLoading ? (
             <MasonryGrid
               items={filteredItems}
-              loading={hasInitialLoadingState}
+              loading={gridLoading}
               renderItem={(item, index) => <ContentCard content={item} index={index} />}
             />
           ) : (
-            <DashboardEmptyState searchActive={Boolean(searchInput.trim() || selectedTag !== 'All' || selectedCategory !== 'All')} />
+            <DashboardEmptyState
+              searchActive={Boolean(searchInput.trim() || selectedTag !== 'All' || selectedCategory !== 'All')}
+              semanticMode={semanticSearchEmpty}
+            />
           )}
         </div>
       </section>
@@ -247,7 +327,7 @@ function DashboardErrorState({ message, onRetry }) {
   );
 }
 
-function DashboardEmptyState({ searchActive }) {
+function DashboardEmptyState({ searchActive, semanticMode = false }) {
   return (
     <GlassCard className="mx-auto max-w-2xl px-6 py-12 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgba(248,174,29,0.12)] text-accent">
@@ -258,7 +338,9 @@ function DashboardEmptyState({ searchActive }) {
       </h2>
       <p className="mt-3 text-sm leading-7 text-obsidian-400">
         {searchActive
-          ? 'Try changing the search term, category, or tag filters to surface a different slice of your archive.'
+          ? semanticMode
+            ? 'No semantic matches were found for this query. Try a broader question or different wording.'
+            : 'Try changing the search term, category, or tag filters to surface a different slice of your archive.'
           : 'Save a link or upload a document above to start building the knowledge canvas.'}
       </p>
     </GlassCard>
