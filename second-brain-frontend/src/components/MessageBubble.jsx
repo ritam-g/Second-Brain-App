@@ -36,9 +36,9 @@ const MessageBubble = ({
 
         {!isUser && sources.length ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {sources.map((source) => (
+            {sources.map((source, index) => (
               <SourceCard
-                key={source.id}
+                key={source.id || `${source.contentId || 'message-source'}-${index}`}
                 source={source}
               />
             ))}
@@ -85,7 +85,7 @@ function SourceCard({ source }) {
       <div className="p-4">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-soft">{source.type || 'source'}</p>
         <h4 className="mt-2 text-sm font-bold text-[#fff1d5]">{source.title}</h4>
-        <p className="mt-2 text-xs leading-6 text-obsidian-400">{source.matchedChunkText}</p>
+        <p className="mt-2 text-xs leading-6 text-obsidian-400">{source.matchedChunkText || source.text}</p>
       </div>
     </Wrapper>
   );

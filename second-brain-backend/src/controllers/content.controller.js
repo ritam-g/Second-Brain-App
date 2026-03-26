@@ -5,7 +5,7 @@ import { generateEmbeddings } from "../services/embedding.service.js"
 import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
 import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
-import { uploadFileToImageKit } from "../services/upload.service.js"
+import { deleteFileFromImageKit, uploadFileToImageKit } from "../services/upload.service.js"
 import {
     buildVectorIds,
     deleteVectorsFromPinecone,
@@ -18,6 +18,8 @@ const minimumIndexableCharacters = 20
 // Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
 // Output: JSON response containing the created content document.
 export async function saveContentController(req, res) {
+    let vectorIds = []
+
     try {
         const { url, title } = req.body
 
@@ -25,24 +27,63 @@ export async function saveContentController(req, res) {
             return res.status(400).json({ message: "URL is required" })
         }
 
+        const userId = String(req.user.id)
+
         // Fetch link metadata first so the saved card is immediately usable in the UI.
         const meta = await getMetadata(url)
+        const resolvedUrl = meta.url || url
 
         // Generate a stable Mongo id up front so `contentId` is always available for future vector linking.
         const contentObjectId = new mongoose.Types.ObjectId()
         const contentId = contentObjectId.toString()
+        const resolvedTitle = title || meta.title || "No title"
+        const indexableText = buildSavedContentIndexText({
+            title: resolvedTitle,
+            description: meta.description,
+            tags: meta.tags,
+            type: meta.type,
+            url: resolvedUrl,
+        })
+        let chunks = []
+        let vectorReady = false
+
+        // Index saved links too so article, LinkedIn, and Instagram content can participate in RAG retrieval.
+        if (hasIndexableText(indexableText)) {
+            chunks = await splitText(indexableText)
+
+            if (chunks.length) {
+                const embeddings = await generateEmbeddings(chunks)
+                vectorIds = await storeVectorsInPinecone({
+                    embeddings,
+                    chunks,
+                    metadata: {
+                        userId,
+                        title: resolvedTitle,
+                        contentId,
+                        type: meta.type || "article",
+                        url: resolvedUrl,
+                        image: meta.image || "",
+                    },
+                })
+
+                vectorReady = vectorIds.length === chunks.length
+            }
+        }
         
         const content = await contentModel.create({
             _id: contentObjectId,
-            url,
-            title: title || meta.title || "No title",
+            url: resolvedUrl,
+            title: resolvedTitle,
             description: meta.description || "",
             summary: meta.description || "",
             image: meta.image || "",
             type: meta.type || "article",
             tags: meta.tags || [],
-            userId: String(req.user.id),
+            userId,
             contentId,
+            textChunks: chunks,
+            vectorReady,
+            vectorIds,
         })
 
         return res.status(201).json({
@@ -50,11 +91,19 @@ export async function saveContentController(req, res) {
             data: content,
         })
     } catch (error) {
+        if (vectorIds.length) {
+            try {
+                await deleteVectorsFromPinecone(vectorIds)
+            } catch (cleanupError) {
+                console.error("Save Content Vector Cleanup Error:", cleanupError.message)
+            }
+        }
+
         console.error("Save Content Error:", error.message)
 
         return res.status(500).json({
             success: false,
-            message: "Failed to save content",
+            message: resolveContentMutationErrorMessage(error, "Failed to save content"),
         })
     }
 }
@@ -65,6 +114,7 @@ export async function saveContentController(req, res) {
 export async function uploadContentController(req, res) {
     // Keep track of stored vector ids so we can clean them up if a later step fails.
     let vectorIds = []
+    let uploadedFileId = ""
 
     try {
         const file = req.file
@@ -97,6 +147,21 @@ export async function uploadContentController(req, res) {
             extractedText: text,
             ocrConfidence: extractedFileContent?.ocrConfidence,
         })
+        // Upload the file before vector storage so Pinecone metadata can keep the real public URL and preview image.
+        const uploadedFile = await uploadFileToImageKit(file, {
+            userId,
+            uploadType,
+        })
+
+        uploadedFileId = String(uploadedFile?.fileId || "").trim()
+
+        if (!uploadedFile?.url) {
+            throw new Error("ImageKit did not return a public file URL")
+        }
+
+        const previewImage = uploadType === "image"
+            ? uploadedFile.url
+            : uploadedFile.thumbnailUrl || ""
 
         let chunks = []
         let vectorReady = false
@@ -119,21 +184,13 @@ export async function uploadContentController(req, res) {
                         title: uploadMetadata.title,
                         contentId,
                         type: uploadType,
+                        url: uploadedFile.url,
+                        image: previewImage,
                     },
                 })
 
                 vectorReady = vectorIds.length === chunks.length
             }
-        }
-
-        // Upload the original file after vector work succeeds so we do not keep orphan files on failed AI runs.
-        const uploadedFile = await uploadFileToImageKit(file, {
-            userId,
-            uploadType,
-        })
-
-        if (!uploadedFile?.url) {
-            throw new Error("ImageKit did not return a public file URL")
         }
 
         // Save the final content document with both UI metadata and vector mapping fields.
@@ -143,9 +200,7 @@ export async function uploadContentController(req, res) {
             title: uploadMetadata.title,
             description: uploadMetadata.description,
             summary: uploadMetadata.description,
-            image: uploadType === "image"
-                ? uploadedFile.url
-                : uploadedFile.thumbnailUrl || "",
+            image: previewImage,
             tags: uploadMetadata.tags,
             type: uploadType,
             url: uploadedFile.url,
@@ -169,10 +224,19 @@ export async function uploadContentController(req, res) {
             }
         }
 
+        // Remove the uploaded asset too when the pipeline fails after ImageKit upload succeeds.
+        if (uploadedFileId) {
+            try {
+                await deleteFileFromImageKit(uploadedFileId)
+            } catch (cleanupError) {
+                console.error("Upload File Cleanup Error:", cleanupError.message)
+            }
+        }
+
         console.error("Upload Content Error:", error.message)
 
         const statusCode = resolveUploadErrorStatus(error)
-        const message = resolveUploadErrorMessage(error)
+        const message = resolveContentMutationErrorMessage(error, "Failed to upload content")
 
         return res.status(statusCode).json({
             success: false,
@@ -412,10 +476,10 @@ function resolveUploadErrorStatus(error) {
     return 500
 }
 
-// Converts low-level upload errors into readable API messages for the frontend or API client.
-// Input: thrown error from upload/extract/AI services.
+// Converts low-level content mutation errors into readable API messages for the frontend or API client.
+// Input: thrown error from upload/save/vector services plus a fallback message.
 // Output: safe response message string.
-function resolveUploadErrorMessage(error) {
+function resolveContentMutationErrorMessage(error, fallbackMessage) {
     const message = String(error?.message || "")
 
     if (message.includes("IMAGEKIT_PRIVATE_KEY")) {
@@ -438,7 +502,7 @@ function resolveUploadErrorMessage(error) {
         return "Failed to store or clean up vectors in Pinecone."
     }
 
-    return "Failed to upload content"
+    return fallbackMessage
 }
 
 // Normalizes extracted text before validation and chunking.
@@ -459,4 +523,17 @@ function normalizeExtractedText(text) {
 function hasIndexableText(text) {
     const normalizedText = normalizeExtractedText(text)
     return normalizedText.length >= minimumIndexableCharacters
+}
+
+// Builds a compact retrieval text block for saved URLs so links can also be embedded and searched.
+// Input: normalized metadata for a saved URL.
+// Output: one chunkable text string for vector indexing.
+function buildSavedContentIndexText({ title, description, tags, type, url }) {
+    return normalizeExtractedText([
+        title ? `Title: ${title}` : "",
+        description ? `Description: ${description}` : "",
+        Array.isArray(tags) && tags.length ? `Tags: ${tags.join(", ")}` : "",
+        type ? `Type: ${type}` : "",
+        url ? `Source URL: ${url}` : "",
+    ].filter(Boolean).join("\n"))
 }

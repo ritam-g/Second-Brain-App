@@ -22,6 +22,20 @@ export async function uploadFileToImageKit(file, options = {}) {
     })
 }
 
+// Deletes an uploaded ImageKit asset so failed pipelines do not leave orphan files behind.
+// Input: ImageKit file id string from a successful upload response.
+// Output: promise that resolves when the remote asset is removed.
+export async function deleteFileFromImageKit(fileId) {
+    const normalizedFileId = String(fileId || "").trim()
+
+    if (!normalizedFileId) {
+        return
+    }
+
+    const client = getImageKitClient()
+    await client.files.delete(normalizedFileId)
+}
+
 // Lazily creates the ImageKit client so the backend only requires upload credentials when this feature is used.
 // Input: none.
 // Output: configured ImageKit client instance.

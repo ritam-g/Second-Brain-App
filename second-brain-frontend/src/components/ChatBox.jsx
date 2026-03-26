@@ -36,7 +36,7 @@ const ChatBox = ({
         </div>
         <h1 className="mt-4 text-2xl font-bold text-[#fff1d5]">Deep Focus</h1>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-obsidian-400">
-          Ask questions against your uploaded documents, OCR content, and saved references. Answers are grounded in the top retrieved chunks from your knowledge base.
+          Ask questions against your uploaded documents, OCR content, and saved references. Deep Focus retrieves the strongest chunks from Pinecone, then asks Mistral to answer from that grounded context.
         </p>
       </div>
 
@@ -60,13 +60,13 @@ const ChatBox = ({
             <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgba(248,174,29,0.14)] text-accent">
               <MessagesSquare className="h-5 w-5" />
             </div>
-            <div className="rounded-[24px] rounded-bl-[8px] border border-[rgba(255,204,102,0.08)] bg-[rgba(25,19,16,0.88)] px-5 py-4 backdrop-blur-xl">
-              <div className="flex items-center gap-2 text-sm text-obsidian-400">
-                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent" />
-                Retrieving relevant knowledge...
+              <div className="rounded-[24px] rounded-bl-[8px] border border-[rgba(255,204,102,0.08)] bg-[rgba(25,19,16,0.88)] px-5 py-4 backdrop-blur-xl">
+                <div className="flex items-center gap-2 text-sm text-obsidian-400">
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent" />
+                  Thinking with retrieved context...
+                </div>
               </div>
             </div>
-          </div>
         ) : null}
       </div>
 
@@ -104,7 +104,7 @@ function EmptyChatState() {
         </div>
         <h2 className="mt-5 text-2xl font-bold text-[#fff1d5]">Start a retrieval-grounded conversation</h2>
         <p className="mt-3 text-sm leading-7 text-obsidian-400">
-          Ask natural language questions and Deep Focus will pull the most relevant chunks from your PDFs, images, and saved content.
+          Ask natural language questions and Deep Focus will retrieve the strongest chunks from your PDFs, images, and saved links before generating an answer.
         </p>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { Pinecone } from "@pinecone-database/pinecone"
 const defaultIndexName = "second-brain"
 const defaultTopK = 5
 const maxTopK = 20
+const maxMetadataTextCharacters = 1600
 
 let pineconeClient = null
 let pineconeIndex = null
@@ -36,6 +37,9 @@ export async function storeVectorsInPinecone({ embeddings = [], chunks = [], met
             contentId: requiredMetadata.contentId,
             chunkIndex,
             type: requiredMetadata.type,
+            url: requiredMetadata.url,
+            image: requiredMetadata.image,
+            text: normalizeChunkMetadataText(chunks[chunkIndex]),
         },
     }))
 
@@ -171,6 +175,8 @@ function normalizeRequiredMetadata(metadata) {
         title: title.slice(0, 200),
         contentId,
         type: String(metadata?.type || "document").trim() || "document",
+        url: normalizeMetadataString(metadata?.url, 600),
+        image: normalizeMetadataString(metadata?.image, 600),
     }
 }
 
@@ -213,4 +219,24 @@ function normalizeTopK(topK) {
     }
 
     return Math.min(maxTopK, Math.max(1, Math.round(numericTopK)))
+}
+
+// Clips chunk text before it is stored as Pinecone metadata so retrieval stays useful without bloating record size.
+// Input: raw chunk string.
+// Output: compact metadata-safe chunk text.
+function normalizeChunkMetadataText(chunk) {
+    return String(chunk || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxMetadataTextCharacters)
+}
+
+// Normalizes optional metadata string fields before they are attached to a Pinecone record.
+// Input: raw metadata value and max length.
+// Output: clipped string value.
+function normalizeMetadataString(value, maxLength) {
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxLength)
 }

@@ -1,4 +1,5 @@
 import ogs from "open-graph-scraper"
+import { generateInstagramDescriptionFallback } from "./ai.service.js"
 import {
     detectPlatform,
     extractBestDescription,
@@ -33,8 +34,8 @@ export async function getMetadata(url) {
         }
 
         const title = extractBestTitle(result, url, platform)
-        const description = extractBestDescription(result)
         const image = extractBestImage(result, url, platform)
+        let description = extractBestDescription(result)
 
         let tags = []
 
@@ -60,6 +61,20 @@ export async function getMetadata(url) {
 
         if (title && title !== "No title") {
             tags.push(...generateTagsFromTitle(title))
+        }
+
+        // Instagram previews often miss usable caption text.
+        // When that happens, ask Mistral for a cautious fallback description from the URL context.
+        if (platform === "instagram" && !description) {
+            try {
+                description = await generateInstagramDescriptionFallback({
+                    url: result.ogUrl || url,
+                    title,
+                    imageUrl: image,
+                })
+            } catch (instagramError) {
+                console.error("Instagram Metadata Fallback Error:", instagramError.message)
+            }
         }
 
         tags.push(platform)
