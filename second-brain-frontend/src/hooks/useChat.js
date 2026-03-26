@@ -128,6 +128,7 @@ function normalizeSource(source, index) {
   const type = String(source.type || source.metadata?.type || 'article').trim().toLowerCase() || 'article';
   const image = String(source.image || source.metadata?.image || '').trim();
   const url = String(source.url || source.metadata?.url || '').trim();
+  const createdAt = String(source.createdAt || source.metadata?.createdAt || '').trim();
   const matchedChunkText = String(
     source.text
     || source.matchedChunkText
@@ -156,6 +157,7 @@ function normalizeSource(source, index) {
     type,
     image,
     url,
+    createdAt,
     description,
     matchedChunkText,
     text: matchedChunkText,

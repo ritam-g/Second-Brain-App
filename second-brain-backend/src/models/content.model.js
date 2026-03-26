@@ -10,6 +10,8 @@ const contentSchema = new mongoose.Schema({
     // Core card fields shown in the product UI.
     title: { type: String, required: true, trim: true },
     url: { type: String, required: true, trim: true },
+    normalizedUrl: { type: String, default: "", trim: true, index: true },
+    fileHash: { type: String, default: "", trim: true, index: true },
 
     tags: { type: [String], required: true, default: [] },
 
@@ -50,8 +52,15 @@ const contentSchema = new mongoose.Schema({
 // Fast dashboard listing for one user.
 contentSchema.index({ userId: 1, createdAt: -1 })
 
+// Direct createdAt index keeps temporal resurfacing queries efficient.
+contentSchema.index({ createdAt: -1 })
+
 // Fast lookup when hydrating Pinecone search hits back into Mongo documents.
 contentSchema.index({ userId: 1, contentId: 1 })
+
+// Fast duplicate checks for saved URLs and uploaded files.
+contentSchema.index({ userId: 1, normalizedUrl: 1 })
+contentSchema.index({ userId: 1, fileHash: 1 })
 
 const contentModel = mongoose.model("Content", contentSchema)
 

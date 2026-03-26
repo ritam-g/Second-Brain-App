@@ -10,6 +10,7 @@ import TagChip from '../../components/content/TagChip';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
 import SearchResults from '../../components/SearchResults';
+import ResurfacingSection from '../../features/resurfacing/ResurfacingSection';
 import { useGetContent, useSaveContent, useFilteredContent, useUploadContent } from '../../hooks/useContent';
 import { useLogout } from '../../hooks/useAuth';
 import { useSemanticSearch } from '../../hooks/useSemanticSearch';
@@ -178,6 +179,8 @@ const Dashboard = () => {
           fileInputRef={fileInputRef}
         />
       </section>
+
+      {!isSearchActive ? <ResurfacingSection /> : null}
 
       <section className="mt-10">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">

@@ -147,7 +147,7 @@ const ContentCard = ({ content, index }) => {
         <div className="mt-6 flex items-center justify-between border-t border-[rgba(255,204,102,0.08)] pt-4 text-xs text-obsidian-500">
           <span className="inline-flex items-center gap-2">
             <Clock3 className="h-3.5 w-3.5" />
-            {relativeTime}
+            Saved {relativeTime}
           </span>
           <span>{footerMeta}</span>
         </div>

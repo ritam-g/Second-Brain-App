@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { BrainCircuit, SearchX, Sparkles } from 'lucide-react';
+import { BrainCircuit, CalendarDays, SearchX, Sparkles } from 'lucide-react';
 import GlassCard from './ui/GlassCard';
 import TagChip from './content/TagChip';
 import Button from './ui/Button';
 import ContentPreview from './ContentPreview';
-import { getSourceLabel, getTypeBadge } from './content/utils/contentMetadata.utils';
+import { getSavedTimeLabel, getSourceLabel, getTypeBadge } from './content/utils/contentMetadata.utils';
 
 // Chunk-level semantic search results view used by the dashboard search experience.
 // Input: normalized semantic search results, current query, loading/error state, and retry callback.
@@ -17,6 +17,8 @@ const SearchResults = ({
   error = '',
   onRetry,
 }) => {
+  const MotionArticle = motion.article;
+
   if (loading) {
     return (
       <div className="grid gap-4 xl:grid-cols-2">
@@ -78,14 +80,14 @@ const SearchResults = ({
 
       <div className="grid gap-4 xl:grid-cols-2">
         {results.map((result, index) => (
-          <motion.article
+          <MotionArticle
             key={result.id}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.28, delay: index * 0.04 }}
           >
             <SearchResultCard result={result} />
-          </motion.article>
+          </MotionArticle>
         ))}
       </div>
     </section>
@@ -95,6 +97,7 @@ const SearchResults = ({
 function SearchResultCard({ result }) {
   const typeBadge = getTypeBadge(result);
   const sourceLabel = getSourceLabel(result);
+  const savedTimeLabel = getSavedTimeLabel(result);
   const scoreValue = Number.isFinite(result?.score) ? `${Math.round(result.score * 100)}%` : null;
 
   return (
@@ -108,6 +111,12 @@ function SearchResultCard({ result }) {
               {typeBadge}
             </span>
             <span className="text-[11px] uppercase tracking-[0.18em] text-obsidian-500">{sourceLabel}</span>
+            {savedTimeLabel ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-2.5 py-1 text-[10px] font-semibold text-obsidian-400">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {savedTimeLabel}
+              </span>
+            ) : null}
             {scoreValue ? (
               <span className="ml-auto text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
                 {scoreValue} match

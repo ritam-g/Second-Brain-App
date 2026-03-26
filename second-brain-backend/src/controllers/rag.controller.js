@@ -40,6 +40,7 @@ export async function ragQueryController(req, res) {
                     image: source.metadata?.image || "",
                     url: source.metadata?.url || "",
                     contentId: source.metadata?.contentId || "",
+                    createdAt: source.metadata?.createdAt || "",
                 })),
             },
         })

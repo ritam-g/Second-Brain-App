@@ -164,12 +164,23 @@ export function getRelativeTime(content) {
   return dayjs(content.createdAt).fromNow();
 }
 
+// Formats a conversational saved-time label that can be reused across resurfacing, search, and chat cards.
+// Input: content-like object with `createdAt` and an optional conversational flag.
+// Output: short label such as "Saved 2 months ago" or "You saved this 2 months ago".
+export function getSavedTimeLabel(content, { conversational = false } = {}) {
+  if (!content?.createdAt) {
+    return conversational ? 'Saved recently' : 'Saved recently';
+  }
+
+  const relativeTime = dayjs(content.createdAt).fromNow();
+  return conversational ? `You saved this ${relativeTime}` : `Saved ${relativeTime}`;
+}
+
 // Builds the small footer note based on the content type.
 // Input: content item.
 // Output: short metadata string.
 export function getFooterMeta(content) {
   const kind = getContentKind(content);
-  const tags = getDisplayTags(content);
 
   if (kind === 'document') {
     return 'Open PDF';

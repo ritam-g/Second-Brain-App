@@ -1,6 +1,7 @@
 import React from 'react';
-import { ExternalLink } from 'lucide-react';
+import { CalendarDays, ExternalLink } from 'lucide-react';
 import ContentPreview from '../ContentPreview';
+import { getSavedTimeLabel } from '../content/utils';
 
 // Individual source citation card for assistant answers.
 // Input: a normalized source object containing preview, title, type, and link metadata.
@@ -17,6 +18,7 @@ const SourceCard = ({
   );
   const sourceHost = resolveSourceHost(source?.url);
   const scoreLabel = resolveScoreLabel(source?.score);
+  const savedTimeLabel = getSavedTimeLabel(source);
 
   return (
     <article className="overflow-hidden rounded-[24px] border border-[rgba(255,204,102,0.08)] bg-[rgba(23,18,15,0.9)] shadow-[0_22px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[rgba(255,191,64,0.18)]">
@@ -41,6 +43,14 @@ const SourceCard = ({
         </div>
 
         <h4 className="mt-3 text-base font-bold leading-7 text-[#fff1d5]">{resolvedTitle}</h4>
+        {savedTimeLabel ? (
+          <div className="mt-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-2.5 py-1 text-[10px] font-semibold text-obsidian-400">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {savedTimeLabel}
+            </span>
+          </div>
+        ) : null}
         <p className="mt-2 text-sm leading-6 text-obsidian-400">
           {resolvedDescription || 'Retrieved context from your archive.'}
         </p>

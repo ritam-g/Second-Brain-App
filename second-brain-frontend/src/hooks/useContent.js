@@ -37,16 +37,22 @@ export const useSaveContent = () => {
         saveContentApi(contentData),
         {
           pending: 'Saving link to your library...',
-          success: () => 'Content saved successfully.',
+          success: (result) => result?.message || 'Content saved successfully.',
           error: (error) => getApiErrorMessage(error, 'Failed to save content'),
         },
         { toastId: 'save-content-request' },
       );
-      const payload = response.data !== undefined ? response.data : response;
-      if (payload) {
+      const result = response && typeof response === 'object' ? response : { data: response };
+      const payload = result.data !== undefined ? result.data : result;
+
+      if (result?.duplicate) {
+        dispatch(setContentLoading(false));
+      } else if (payload) {
         dispatch(addContentItem(payload));
+      } else {
+        dispatch(setContentLoading(false));
       }
-      return { success: true, data: payload };
+      return { success: true, data: payload, duplicate: Boolean(result?.duplicate), message: result?.message || '' };
     } catch (err) {
       const message = getApiErrorMessage(err, 'Failed to save content');
       dispatch(setContentError(message));
@@ -102,16 +108,22 @@ export const useUploadContent = () => {
         uploadContentApi(formData),
         {
           pending: 'Uploading file to your library...',
-          success: () => 'File uploaded successfully.',
+          success: (result) => result?.message || 'File uploaded successfully.',
           error: (error) => getApiErrorMessage(error, 'Failed to upload file'),
         },
         { toastId: 'upload-content-request' },
       );
-      const payload = response.data !== undefined ? response.data : response;
-      if (payload) {
+      const result = response && typeof response === 'object' ? response : { data: response };
+      const payload = result.data !== undefined ? result.data : result;
+
+      if (result?.duplicate) {
+        dispatch(setContentLoading(false));
+      } else if (payload) {
         dispatch(addContentItem(payload));
+      } else {
+        dispatch(setContentLoading(false));
       }
-      return { success: true, data: payload };
+      return { success: true, data: payload, duplicate: Boolean(result?.duplicate), message: result?.message || '' };
     } catch (err) {
       const message = getApiErrorMessage(err, 'Failed to upload file');
       dispatch(setContentError(message));

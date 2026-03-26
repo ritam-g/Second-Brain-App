@@ -1,4 +1,5 @@
 import mongoose from "mongoose"
+import { createHash } from "node:crypto"
 import contentModel from "../models/content.model.js"
 import { generateStructuredTags } from "../services/aiTagging.service.js"
 import { splitText } from "../services/chunk.service.js"
@@ -31,10 +32,36 @@ export async function saveContentController(req, res) {
         }
 
         const userId = String(req.user.id)
+        const normalizedRequestedUrl = normalizeComparableUrl(url)
+        const existingSavedContent = await findExistingUrlContent({
+            userId,
+            rawUrl: url,
+            normalizedUrl: normalizedRequestedUrl,
+        })
+
+        if (existingSavedContent) {
+            return respondWithDuplicateContent(res, {
+                content: existingSavedContent,
+                fallbackMessage: "This link is already in your archive.",
+            })
+        }
 
         // 🔍 STEP 1: Fetch metadata from URL (title, description, image, etc.)
         const meta = await getMetadata(url)
         const resolvedUrl = meta.url || url
+        const normalizedResolvedUrl = normalizeComparableUrl(resolvedUrl)
+        const existingResolvedContent = await findExistingUrlContent({
+            userId,
+            rawUrl: resolvedUrl,
+            normalizedUrl: normalizedResolvedUrl,
+        })
+
+        if (existingResolvedContent) {
+            return respondWithDuplicateContent(res, {
+                content: existingResolvedContent,
+                fallbackMessage: "This link is already in your archive.",
+            })
+        }
 
         // 🆔 STEP 2: Create MongoDB ID early (used for vector linking)
         const contentObjectId = new mongoose.Types.ObjectId()
@@ -126,6 +153,7 @@ export async function saveContentController(req, res) {
             _id: contentObjectId,
 
             url: resolvedUrl,
+            normalizedUrl: normalizedResolvedUrl,
             title: resolvedTitle,
             description: meta.description || "",
             summary: meta.description || "",
@@ -200,6 +228,18 @@ export async function uploadContentController(req, res) {
         }
 
         const userId = String(req.user.id)
+        const fileHash = createFileHash(file)
+        const existingUploadedContent = await findExistingUploadedContent({
+            userId,
+            fileHash,
+        })
+
+        if (existingUploadedContent) {
+            return respondWithDuplicateContent(res, {
+                content: existingUploadedContent,
+                fallbackMessage: "This file is already in your archive.",
+            })
+        }
 
         // Create the Mongo id before vector storage so Pinecone metadata can point back to this document.
         const contentObjectId = new mongoose.Types.ObjectId()
@@ -283,6 +323,8 @@ export async function uploadContentController(req, res) {
             subCategory: aiTags.subCategory,
             type: uploadType,
             url: uploadedFile.url,
+            normalizedUrl: normalizeComparableUrl(uploadedFile.url),
+            fileHash,
             textChunks: chunks,
             embedding: fullEmbedding,
             vectorReady,
@@ -333,7 +375,7 @@ export async function getContentAllController(req, res, next) {
         const contents = await contentModel.find({ userId: String(req.user.id) }).sort({ createdAt: -1 })
         return res.status(200).json({
             success: true,
-            data: contents,
+            data: contents.map(content => sanitizeContentDocument(content)),
         })
     } catch (error) {
         console.error(error)
@@ -371,7 +413,7 @@ export async function DeleteContentController(req, res, next) {
         return res.status(200).json({
             success: true,
             message: "Content deleted successfully",
-            data: deletedContent,
+            data: sanitizeContentDocument(deletedContent),
         })
     } catch (error) {
         console.error("Delete Content Error:", error.message)
@@ -391,7 +433,7 @@ export async function getSingleUserContentController(req, res, next) {
         const content = await contentModel.find({ userId: id }).sort({ createdAt: -1 })
         return res.status(200).json({
             success: true,
-            data: content,
+            data: content.map(item => sanitizeContentDocument(item)),
         })
     } catch (error) {
         console.error("Get Single User Content Error:", error.message)
@@ -641,6 +683,135 @@ function sanitizeContentDocument(content) {
         : { ...(content || {}) }
 
     delete normalizedContent.embedding
+    delete normalizedContent.fileHash
+    delete normalizedContent.normalizedUrl
 
     return normalizedContent
+}
+
+// Finds an existing saved URL for the same user using both raw and normalized URL forms.
+// Input: authenticated user id plus raw and normalized URL candidates.
+// Output: matching content document or null.
+async function findExistingUrlContent({ userId, rawUrl, normalizedUrl }) {
+    const candidates = [rawUrl, normalizedUrl]
+        .map(value => String(value || "").trim())
+        .filter(Boolean)
+    const uniqueCandidates = [...new Set(candidates)]
+
+    if (!uniqueCandidates.length) {
+        return null
+    }
+
+    return contentModel.findOne({
+        userId,
+        $or: [
+            { normalizedUrl: { $in: uniqueCandidates } },
+            { url: { $in: uniqueCandidates } },
+        ],
+    }).sort({ createdAt: -1 })
+}
+
+// Finds an existing uploaded file for the same user using the computed file hash.
+// Input: authenticated user id and SHA-256 file hash string.
+// Output: matching content document or null.
+async function findExistingUploadedContent({ userId, fileHash }) {
+    const normalizedFileHash = String(fileHash || "").trim()
+
+    if (!normalizedFileHash) {
+        return null
+    }
+
+    return contentModel.findOne({
+        userId,
+        fileHash: normalizedFileHash,
+    }).sort({ createdAt: -1 })
+}
+
+// Returns a successful duplicate response so the UI can show when the original save happened.
+// Input: Express response plus the matching content document and fallback message.
+// Output: duplicate-aware JSON response.
+function respondWithDuplicateContent(res, { content, fallbackMessage }) {
+    return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: buildDuplicateContentMessage(content, fallbackMessage),
+        data: sanitizeContentDocument(content),
+    })
+}
+
+// Formats a duplicate-save message that includes the original saved date when available.
+// Input: existing content document and fallback message string.
+// Output: user-facing duplicate message.
+function buildDuplicateContentMessage(content, fallbackMessage) {
+    const savedDateLabel = formatSavedDate(content?.createdAt)
+    return savedDateLabel ? `You already saved this on ${savedDateLabel}.` : fallbackMessage
+}
+
+// Builds a comparable URL key by removing tracking params and normalizing host/path details.
+// Input: raw URL string.
+// Output: normalized URL string or the trimmed input when parsing fails.
+function normalizeComparableUrl(url) {
+    const trimmedUrl = String(url || "").trim()
+
+    if (!trimmedUrl) {
+        return ""
+    }
+
+    try {
+        const parsedUrl = new URL(trimmedUrl)
+        const searchParams = new URLSearchParams(parsedUrl.search)
+        const removableParams = new Set(["fbclid", "gclid", "igshid", "mc_cid", "mc_eid", "ref", "si"])
+
+        Array.from(searchParams.keys()).forEach(key => {
+            const normalizedKey = String(key || "").toLowerCase()
+
+            if (normalizedKey.startsWith("utm_") || removableParams.has(normalizedKey)) {
+                searchParams.delete(key)
+            }
+        })
+
+        const sortedParams = [...searchParams.entries()].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+
+        parsedUrl.hash = ""
+        parsedUrl.protocol = parsedUrl.protocol.toLowerCase()
+        parsedUrl.hostname = parsedUrl.hostname.toLowerCase()
+
+        if (
+            (parsedUrl.protocol === "http:" && parsedUrl.port === "80")
+            || (parsedUrl.protocol === "https:" && parsedUrl.port === "443")
+        ) {
+            parsedUrl.port = ""
+        }
+
+        parsedUrl.pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/"
+        parsedUrl.search = sortedParams.length ? `?${new URLSearchParams(sortedParams).toString()}` : ""
+
+        return parsedUrl.toString()
+    } catch {
+        return trimmedUrl
+    }
+}
+
+// Computes a stable hash for uploaded files so exact duplicates can be detected before upload.
+// Input: multer file object.
+// Output: SHA-256 hex digest string.
+function createFileHash(file) {
+    return file?.buffer ? createHash("sha256").update(file.buffer).digest("hex") : ""
+}
+
+// Formats a readable saved date for duplicate-save messaging.
+// Input: raw createdAt value.
+// Output: formatted date string or empty string.
+function formatSavedDate(value) {
+    const parsedDate = value instanceof Date ? value : new Date(value)
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return ""
+    }
+
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    }).format(parsedDate)
 }

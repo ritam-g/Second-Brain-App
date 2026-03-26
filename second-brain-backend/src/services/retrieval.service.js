@@ -100,6 +100,7 @@ function normalizeRetrievedMatch(match, documentsByContentId) {
     const type = normalizeDisplayValue(match?.metadata?.type || contentDocument?.type || "article", 40).toLowerCase()
     const image = normalizeDisplayValue(match?.metadata?.image || contentDocument?.image, 600)
     const url = normalizeDisplayValue(match?.metadata?.url || contentDocument?.url, 600)
+    const createdAt = normalizeDateValue(match?.metadata?.createdAt || contentDocument?.createdAt)
     const text = metadataText || fallbackText
 
     if (!vectorId || !contentId || !title || !text) {
@@ -111,6 +112,7 @@ function normalizeRetrievedMatch(match, documentsByContentId) {
         score: Number.isFinite(match?.score) ? match.score : null,
         description: normalizeDisplayValue(contentDocument?.description || contentDocument?.summary, 300),
         tags: Array.isArray(contentDocument?.tags) ? contentDocument.tags : [],
+        createdAt,
         metadata: {
             contentId,
             text,
@@ -118,6 +120,7 @@ function normalizeRetrievedMatch(match, documentsByContentId) {
             type,
             image,
             url,
+            createdAt,
             chunkIndex: Number.isInteger(chunkIndex) ? chunkIndex : null,
         },
     }
@@ -138,4 +141,17 @@ function normalizeDisplayValue(value, maxLength) {
 // Output: clipped chunk text string.
 function normalizeChunkText(value) {
     return normalizeDisplayValue(value, maxChunkCharacters)
+}
+
+// Converts Mongo/Pinecone timestamps into stable ISO strings for frontend cards.
+// Input: raw date-like value.
+// Output: ISO timestamp string or empty string.
+function normalizeDateValue(value) {
+    const parsedDate = value instanceof Date ? value : new Date(value)
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return ""
+    }
+
+    return parsedDate.toISOString()
 }

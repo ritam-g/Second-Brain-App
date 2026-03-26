@@ -58,6 +58,7 @@ function normalizeSemanticResult(result, index) {
   const type = String(metadata?.type || result.type || 'article').trim().toLowerCase() || 'article';
   const image = String(metadata?.image || result.image || '').trim();
   const url = String(metadata?.url || result.url || '').trim();
+  const createdAt = String(metadata?.createdAt || result.createdAt || '').trim();
   const matchedChunkText = normalizeSnippet(
     metadata?.text
     || result.matchedChunkText
@@ -75,6 +76,7 @@ function normalizeSemanticResult(result, index) {
     type,
     image,
     url,
+    createdAt,
     matchedChunkText,
     description: String(result.description || result.summary || '').trim(),
     tags: Array.isArray(result.tags) ? result.tags : [],
@@ -85,6 +87,7 @@ function normalizeSemanticResult(result, index) {
       type,
       image,
       url,
+      createdAt,
       text: matchedChunkText,
     },
     raw: result,
