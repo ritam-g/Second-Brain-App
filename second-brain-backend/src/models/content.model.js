@@ -40,6 +40,9 @@ const contentSchema = new mongoose.Schema({
 
     // Raw chunk text kept in Mongo for debugging, RAG, and future chat workflows.
     textChunks: { type: [String], default: [] },
+
+    // Stores one content-level embedding for relationship graph building.
+    embedding: { type: [Number], default: [], select: false },
 }, {
     timestamps: true,
 })

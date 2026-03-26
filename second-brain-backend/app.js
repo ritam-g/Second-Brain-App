@@ -5,6 +5,7 @@ import contentRouter from './src/routes/content.routes.js'
 import authRouter from './src/routes/auth.routes.js'
 import searchRouter from './src/routes/search.routes.js'
 import ragRouter from './src/routes/rag.routes.js'
+import graphRouter from './src/routes/graph.routes.js'
 
 
 const app = express()
@@ -20,6 +21,7 @@ app.use(cors({
 
 app.use('/api/content', contentRouter)
 app.use('/api/auth', authRouter)
+app.use('/api/graph', graphRouter)
 app.use('/api', searchRouter)
 app.use('/api', ragRouter)
 // Global error handler for JSON parsing errors (e.g. malformed JSON in request body)

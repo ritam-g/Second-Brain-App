@@ -1,6 +1,7 @@
 import { MistralAIEmbeddings } from "@langchain/mistralai"
 
 const maxQueryCharacters = 4000
+const maxDocumentCharacters = 12000
 
 let embeddingClient = null
 
@@ -24,15 +25,28 @@ export async function generateEmbeddings(chunks = []) {
     return embeddings
 }
 
+// Generates a single embedding vector for one full content body so documents can be compared at the content level.
+// Input: raw content text.
+// Output: one embedding vector representing the whole content item.
+export async function embedText(text) {
+    const normalizedText = normalizeSingleText(text, "Content text is required for embedding")
+
+    const client = getEmbeddingClient()
+    const embeddings = await client.embedDocuments([normalizedText.slice(0, maxDocumentCharacters)])
+    const vector = embeddings?.[0]
+
+    if (!Array.isArray(vector) || !vector.length) {
+        throw new Error("Embedding generation returned an empty content vector")
+    }
+
+    return vector
+}
+
 // Generates a single embedding vector for semantic search queries.
 // Input: search query text.
 // Output: one embedding vector ready to query Pinecone.
 export async function embedQuery(query) {
-    const normalizedQuery = String(query || "").trim()
-
-    if (!normalizedQuery) {
-        throw new Error("Search query is required for semantic search")
-    }
+    const normalizedQuery = normalizeSingleText(query, "Search query is required for semantic search")
 
     const client = getEmbeddingClient()
     const vector = await client.embedQuery(normalizedQuery.slice(0, maxQueryCharacters))
@@ -80,4 +94,19 @@ function normalizeChunks(chunks) {
     return chunks
         .map(chunk => String(chunk || "").replace(/\s+/g, " ").trim())
         .filter(Boolean)
+}
+
+// Normalizes one text input before it is sent to the embedding model.
+// Input: raw text plus the empty-input error message.
+// Output: compact, non-empty string.
+function normalizeSingleText(text, emptyMessage) {
+    const normalizedText = String(text || "")
+        .replace(/\s+/g, " ")
+        .trim()
+
+    if (!normalizedText) {
+        throw new Error(emptyMessage)
+    }
+
+    return normalizedText
 }

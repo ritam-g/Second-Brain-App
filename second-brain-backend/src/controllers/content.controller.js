@@ -2,7 +2,7 @@ import mongoose from "mongoose"
 import contentModel from "../models/content.model.js"
 import { generateStructuredTags } from "../services/aiTagging.service.js"
 import { splitText } from "../services/chunk.service.js"
-import { generateEmbeddings } from "../services/embedding.service.js"
+import { embedText, generateEmbeddings } from "../services/embedding.service.js"
 import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
 import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
@@ -53,6 +53,7 @@ export async function saveContentController(req, res) {
         })
 
         let chunks = []
+        let fullEmbedding = []
         let vectorReady = false
 
         // ============================================
@@ -61,6 +62,8 @@ export async function saveContentController(req, res) {
 
         // Only process if text is meaningful
         if (hasIndexableText(indexableText)) {
+            // Store one embedding for the full item so the graph layer can compare saved content.
+            fullEmbedding = await embedText(indexableText)
 
             // ✂️ Split text into smaller chunks (better for search)
             chunks = await splitText(indexableText)
@@ -140,16 +143,16 @@ export async function saveContentController(req, res) {
             // 🔗 Vector mapping
             contentId,
             textChunks: chunks,
+            embedding: fullEmbedding,
             vectorReady,
             vectorIds,
         })
-        console.log("content saved successfully:->>",content);
         
 
         // ✅ SUCCESS RESPONSE
         return res.status(201).json({
             success: true,
-            data: content,
+            data: sanitizeContentDocument(content),
         })
 
     } catch (error) {
@@ -234,10 +237,14 @@ export async function uploadContentController(req, res) {
             : uploadedFile.thumbnailUrl || ""
 
         let chunks = []
+        let fullEmbedding = []
         let vectorReady = false
 
         // Only vectorize files with enough readable text to be useful for semantic search.
         if (hasIndexableText(text)) {
+            // Store one document-level embedding alongside the chunk vectors for graph relationships.
+            fullEmbedding = await embedText(text)
+
             // Split large text into smaller retrieval-friendly chunks.
             chunks = await splitText(text)
 
@@ -277,6 +284,7 @@ export async function uploadContentController(req, res) {
             type: uploadType,
             url: uploadedFile.url,
             textChunks: chunks,
+            embedding: fullEmbedding,
             vectorReady,
             contentId,
             vectorIds,
@@ -284,7 +292,7 @@ export async function uploadContentController(req, res) {
 
         return res.status(201).json({
             success: true,
-            data: content,
+            data: sanitizeContentDocument(content),
         })
     } catch (error) {
         // If Mongo/ImageKit fails after Pinecone succeeds, remove those vectors to avoid stale search records.
@@ -622,4 +630,17 @@ function resolveUploadTags(structuredTags, fallbackTags) {
         .filter(Boolean)
 
     return [...new Set(normalizedTags)].slice(0, 10)
+}
+
+// Removes internal-only fields before newly created content documents are returned to the client.
+// Input: Mongoose document or plain object.
+// Output: plain content object safe for API responses.
+function sanitizeContentDocument(content) {
+    const normalizedContent = typeof content?.toObject === "function"
+        ? content.toObject()
+        : { ...(content || {}) }
+
+    delete normalizedContent.embedding
+
+    return normalizedContent
 }
