@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import Dashboard from '../pages/dashboard/Dashboard';
+import DeepFocus from '../pages/DeepFocus';
 import { ProtectedRoute, PublicRoute } from './RouteGuards';
 
 // BENEFIT of utilizing User and Loading states:
@@ -38,6 +39,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Dashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/deep-focus',
+    element: (
+      <ProtectedRoute>
+        <DeepFocus />
       </ProtectedRoute>
     ),
   },

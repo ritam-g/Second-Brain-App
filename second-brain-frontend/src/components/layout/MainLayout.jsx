@@ -12,12 +12,14 @@ const MainLayout = ({
   user,
   searchValue,
   onSearchChange,
-  categories,
+  categories = [],
   selectedCategory,
   onCategoryChange,
   onPrimaryAction,
   onLogout,
   logoutLoading,
+  searchPlaceholder,
+  rightMetaLabel,
   children,
 }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -105,6 +107,8 @@ const MainLayout = ({
           onLogout={onLogout}
           logoutLoading={logoutLoading}
           isSidebarCompact={isSidebarCompact}
+          searchPlaceholder={searchPlaceholder}
+          rightMetaLabel={rightMetaLabel}
         />
 
         <MotionMain

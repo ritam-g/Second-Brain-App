@@ -11,7 +11,7 @@ const Topbar = ({
   user,
   searchValue,
   onSearchChange,
-  categories,
+  categories = [],
   selectedCategory,
   onCategoryChange,
   onOpenSidebar,
@@ -19,8 +19,11 @@ const Topbar = ({
   onLogout,
   logoutLoading,
   isSidebarCompact = false,
+  searchPlaceholder = 'Search the archive...',
+  rightMetaLabel,
 }) => {
   const initials = getUserInitials(user);
+  const hasCategories = Array.isArray(categories) && categories.length > 0;
 
   return (
     <header className={clsx('fixed right-0 top-0 z-30 left-0', isSidebarCompact ? 'lg:left-24' : 'lg:left-[17.5rem]')}>
@@ -49,7 +52,7 @@ const Topbar = ({
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Search the archive..."
+                placeholder={searchPlaceholder}
                 icon={Search}
                 className="w-full"
               />
@@ -75,29 +78,31 @@ const Topbar = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="obsidian-scroll flex gap-2 overflow-x-auto">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => onCategoryChange(category)}
-                  className={clsx(
-                    'rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
-                    selectedCategory === category
-                      ? 'text-accent'
-                      : 'text-obsidian-500 hover:text-obsidian-300',
-                  )}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+          {hasCategories || rightMetaLabel ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="obsidian-scroll flex gap-2 overflow-x-auto">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => onCategoryChange(category)}
+                    className={clsx(
+                      'rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
+                      selectedCategory === category
+                        ? 'text-accent'
+                        : 'text-obsidian-500 hover:text-obsidian-300',
+                    )}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
 
-            <div className="hidden text-xs uppercase tracking-[0.22em] text-obsidian-500 md:block">
-              Curated for {user?.username || 'your library'}
+              <div className="hidden text-xs uppercase tracking-[0.22em] text-obsidian-500 md:block">
+                {rightMetaLabel || `Curated for ${user?.username || 'your library'}`}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
     </header>

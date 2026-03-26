@@ -1,5 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Archive,
   BookOpenText,
@@ -16,8 +17,8 @@ import {
 import Button from '../ui/Button';
 
 const navigationItems = [
-  { label: 'Library', icon: BookOpenText, active: true },
-  { label: 'Deep Focus', icon: BrainCircuit },
+  { label: 'Library', icon: BookOpenText, path: '/dashboard' },
+  { label: 'Deep Focus', icon: BrainCircuit, path: '/deep-focus' },
   { label: 'Recent Discoveries', icon: Compass },
   { label: 'Archived Thoughts', icon: FolderArchive },
   { label: 'Settings', icon: Settings },
@@ -34,6 +35,8 @@ const Sidebar = ({
   onClose,
   onPrimaryAction,
 }) => {
+  const location = useLocation();
+
   return (
     <aside
       className={clsx(
@@ -85,24 +88,42 @@ const Sidebar = ({
       <nav className="mt-8 flex flex-1 flex-col gap-2">
         {navigationItems.map((item) => {
           const NavIcon = item.icon;
+          const isActive = item.path ? location.pathname.startsWith(item.path) : false;
+          const baseClassName = clsx(
+            'flex items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all duration-200',
+            isActive
+              ? 'bg-[rgba(248,174,29,0.14)] text-accent shadow-[inset_0_0_0_1px_rgba(255,191,64,0.1)]'
+              : 'text-obsidian-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-obsidian-300',
+            isCompact && !isMobile && 'justify-center px-0',
+          );
+
+          if (item.path) {
+            return (
+              <NavLink
+                key={item.label}
+                to={item.path}
+                onClick={isMobile ? onClose : undefined}
+                className={baseClassName}
+              >
+                {React.createElement(NavIcon, {
+                  className: clsx('h-4 w-4 shrink-0', !isCompact || isMobile ? 'mr-3' : ''),
+                })}
+                {!isCompact || isMobile ? <span>{item.label}</span> : null}
+              </NavLink>
+            );
+          }
 
           return (
-          <button
-            key={item.label}
-            type="button"
-            className={clsx(
-              'flex items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all duration-200',
-              item.active
-                ? 'bg-[rgba(248,174,29,0.14)] text-accent shadow-[inset_0_0_0_1px_rgba(255,191,64,0.1)]'
-                : 'text-obsidian-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-obsidian-300',
-              isCompact && !isMobile && 'justify-center px-0',
-            )}
-          >
-            {React.createElement(NavIcon, {
-              className: clsx('h-4 w-4 shrink-0', !isCompact || isMobile ? 'mr-3' : ''),
-            })}
-            {!isCompact || isMobile ? <span>{item.label}</span> : null}
-          </button>
+            <button
+              key={item.label}
+              type="button"
+              className={baseClassName}
+            >
+              {React.createElement(NavIcon, {
+                className: clsx('h-4 w-4 shrink-0', !isCompact || isMobile ? 'mr-3' : ''),
+              })}
+              {!isCompact || isMobile ? <span>{item.label}</span> : null}
+            </button>
           );
         })}
       </nav>

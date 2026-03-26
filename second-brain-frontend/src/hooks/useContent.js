@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
 import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi, semanticSearchContentApi } from '../api/content.api';
@@ -147,45 +147,21 @@ export const useSemanticSearchContent = () => {
   return { searchContent, loading };
 };
 
-/**
- * REASONING FOR `useFilteredContent`:
- *
- * 1. CLEAN ARCHITECTURE: The original content fetched from the API stays isolated inside Redux (`items`).
- *    We do NOT put filtered data into Redux, because filtering is purely a UI concern.
- * 2. PERFORMANCE (DEBOUNCE): We use a 300ms debounce on the `searchTerm`. Instead of re-evaluating
- *    the expensive `useMemo` filter loop on every single keystroke, it waits until the user
- *    pauses typing. This dramatically improves UX and frontend performance for large arrays.
- * 3. NO API OVERHEAD: Filtering happens strictly on the frontend instead of re-fetching from the server.
- * 4. MULTI-FILTER SUPPORT: The dashboard needs search, category, and tag filtering together, so the
- *    hook accepts a structured filter object and keeps the combinational logic out of the page component.
- */
+// Keeps category and tag filtering local for archive browsing.
+// Text search is intentionally excluded because semantic search now happens through the backend API.
 export const useFilteredContent = (content, filters = {}) => {
-  const { searchTerm = '', selectedTag = 'All', selectedCategory = 'All' } = filters;
-  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchTerm]);
+  const { selectedTag = 'All', selectedCategory = 'All' } = filters;
 
   const filteredContent = useMemo(() => {
-    if (!content) return [];
+    if (!Array.isArray(content) || !content.length) {
+      return [];
+    }
 
-    return content.filter((item) => {
-      const normalizedSearch = debouncedSearch.trim().toLowerCase();
-      const normalizedTitle = String(item.title || '').toLowerCase();
-      const normalizedTag = String(selectedTag || 'All');
-      const normalizedCategory = String(selectedCategory || 'All');
+    const normalizedTag = String(selectedTag || 'All');
+    const normalizedCategory = String(selectedCategory || 'All');
+    const results = [];
 
-      const matchSearch =
-        !normalizedSearch
-        || normalizedTitle.includes(normalizedSearch);
-
+    for (const item of content) {
       const matchTag =
         !normalizedTag
         || normalizedTag === 'All'
@@ -197,9 +173,13 @@ export const useFilteredContent = (content, filters = {}) => {
         || normalizedCategory === 'All'
         || resolveDashboardCategory(item) === normalizedCategory;
 
-      return matchSearch && matchTag && matchCategory;
-    });
-  }, [content, debouncedSearch, selectedTag, selectedCategory]);
+      if (matchTag && matchCategory) {
+        results.push(item);
+      }
+    }
+
+    return results;
+  }, [content, selectedTag, selectedCategory]);
 
   return { filteredContent };
 };

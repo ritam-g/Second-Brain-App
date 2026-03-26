@@ -80,7 +80,7 @@ const ContentCard = ({ content, index }) => {
 
   return (
     <GlassCard interactive className="group relative overflow-hidden">
-      {destinationUrl && destinationUrl !== '#' ? (
+      {previewType !== 'youtube' && destinationUrl && destinationUrl !== '#' ? (
         <a
           href={destinationUrl}
           target="_blank"
@@ -95,6 +95,7 @@ const ContentCard = ({ content, index }) => {
       <CardPreview
         previewType={previewType}
         previewSource={previewSource}
+        destinationUrl={destinationUrl}
         title={displayTitle}
         label={cardLabel}
         sourceLabel={sourceLabel}
@@ -158,6 +159,7 @@ const ContentCard = ({ content, index }) => {
 function CardPreview({
   previewType,
   previewSource,
+  destinationUrl,
   title,
   label,
   sourceLabel,
@@ -173,6 +175,36 @@ function CardPreview({
         label={label}
         sourceLabel={sourceLabel}
       />
+    );
+  }
+
+  const youtubeEmbedUrl = previewType === 'youtube' ? buildYouTubeEmbedUrl(destinationUrl) : '';
+
+  if (youtubeEmbedUrl) {
+    return (
+      <div className="relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]">
+        <iframe
+          src={youtubeEmbedUrl}
+          title={title}
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="h-full w-full border-0"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(12,9,8,0.82)] via-[rgba(12,9,8,0.14)] to-transparent" />
+        <PreviewBadge label={label} />
+
+        <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
+          <div className="min-w-0 max-w-[78%]">
+            <p className="truncate text-[10px] uppercase tracking-[0.24em] text-[#f2d6a7]/80">{sourceLabel}</p>
+            <h3 className="mt-2 text-xl font-bold leading-tight text-[#fff3db]" style={getLineClampStyle(2)}>{title}</h3>
+          </div>
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[rgba(255,241,214,0.14)] bg-[rgba(12,9,8,0.58)] text-[#fff3db] backdrop-blur-xl">
+            <PlayCircle className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -314,6 +346,34 @@ function previewLoadsInstantly(source) {
 
 function isGeneratedPreview(source) {
   return String(source || '').startsWith('data:image/');
+}
+
+function buildYouTubeEmbedUrl(url) {
+  const videoId = extractYouTubeId(url);
+
+  if (!videoId) {
+    return '';
+  }
+
+  return `https://www.youtube.com/embed/${videoId}`;
+}
+
+function extractYouTubeId(url) {
+  try {
+    const parsedUrl = new URL(url);
+
+    if (parsedUrl.hostname.includes('youtu.be')) {
+      return parsedUrl.pathname.replace('/', '').trim();
+    }
+
+    if (parsedUrl.pathname.startsWith('/shorts/')) {
+      return parsedUrl.pathname.split('/').filter(Boolean)[1] || '';
+    }
+
+    return parsedUrl.searchParams.get('v') || '';
+  } catch {
+    return '';
+  }
 }
 
 export default ContentCard;
