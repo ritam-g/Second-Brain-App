@@ -137,6 +137,16 @@ function normalizeSource(source, index) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 320);
+  const description = String(
+    source.description
+    || source.summary
+    || source.metadata?.description
+    || source.metadata?.summary
+    || matchedChunkText,
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220);
   const numericScore = Number(source.score);
 
   return {
@@ -146,6 +156,7 @@ function normalizeSource(source, index) {
     type,
     image,
     url,
+    description,
     matchedChunkText,
     text: matchedChunkText,
     score: Number.isFinite(numericScore) ? numericScore : null,
