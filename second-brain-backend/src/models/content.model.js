@@ -13,6 +13,10 @@ const contentSchema = new mongoose.Schema({
 
     tags: { type: [String], required: true, default: [] },
 
+    // Hierarchical AI classification used for smarter filtering and future graph/grouping workflows.
+    category: { type: String, default: "" },
+    subCategory: { type: String, default: "" },
+
     type: {
         type: String,
         enum: ["article", "youtube", "tweet", "pdf", "document", "image", "linkedin", "instagram", "github", "x"],

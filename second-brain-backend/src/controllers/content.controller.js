@@ -1,5 +1,6 @@
 import mongoose from "mongoose"
 import contentModel from "../models/content.model.js"
+import { generateStructuredTags } from "../services/aiTagging.service.js"
 import { splitText } from "../services/chunk.service.js"
 import { generateEmbeddings } from "../services/embedding.service.js"
 import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
@@ -18,25 +19,31 @@ const minimumIndexableCharacters = 20
 // Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
 // Output: JSON response containing the created content document.
 export async function saveContentController(req, res) {
+    // Store vector IDs so we can rollback if something fails later
     let vectorIds = []
 
     try {
         const { url, title } = req.body
 
+        // ❌ Validation: URL is required
         if (!url) {
             return res.status(400).json({ message: "URL is required" })
         }
 
         const userId = String(req.user.id)
 
-        // Fetch link metadata first so the saved card is immediately usable in the UI.
+        // 🔍 STEP 1: Fetch metadata from URL (title, description, image, etc.)
         const meta = await getMetadata(url)
         const resolvedUrl = meta.url || url
 
-        // Generate a stable Mongo id up front so `contentId` is always available for future vector linking.
+        // 🆔 STEP 2: Create MongoDB ID early (used for vector linking)
         const contentObjectId = new mongoose.Types.ObjectId()
         const contentId = contentObjectId.toString()
+
+        // 🏷️ STEP 3: Resolve final title
         const resolvedTitle = title || meta.title || "No title"
+
+        // 🧠 STEP 4: Build searchable text (used for embeddings + AI)
         const indexableText = buildSavedContentIndexText({
             title: resolvedTitle,
             description: meta.description,
@@ -44,53 +51,113 @@ export async function saveContentController(req, res) {
             type: meta.type,
             url: resolvedUrl,
         })
+
         let chunks = []
         let vectorReady = false
 
-        // Index saved links too so article, LinkedIn, and Instagram content can participate in RAG retrieval.
+        // ============================================
+        // 🔷 STEP 5: VECTOR PIPELINE (RAG FOUNDATION)
+        // ============================================
+
+        // Only process if text is meaningful
         if (hasIndexableText(indexableText)) {
+
+            // ✂️ Split text into smaller chunks (better for search)
             chunks = await splitText(indexableText)
 
             if (chunks.length) {
+
+                // 🧬 Convert chunks → embeddings (vectors)
                 const embeddings = await generateEmbeddings(chunks)
+
+                // 📦 Store vectors in Pinecone with metadata
                 vectorIds = await storeVectorsInPinecone({
                     embeddings,
                     chunks,
                     metadata: {
-                        userId,
+                        userId,                 // 🔐 Used for filtering user data
                         title: resolvedTitle,
-                        contentId,
+                        contentId,              // 🔗 Link to MongoDB
                         type: meta.type || "article",
                         url: resolvedUrl,
                         image: meta.image || "",
                     },
                 })
 
+                // ✅ Check if all vectors stored successfully
                 vectorReady = vectorIds.length === chunks.length
             }
         }
-        
+
+        // ============================================
+        // 🧠 STEP 6: AI TAGGING (SMART ORGANIZATION)
+        // ============================================
+
+        const aiTags = hasIndexableText(indexableText)
+            ? await generateStructuredTags(indexableText)
+            : {
+                category: "General",
+                subCategory: "Misc",
+                tags: []
+            }
+
+        // ============================================
+        // 🏷️ STEP 7: MERGE TAGS (AI + METADATA)
+        // ============================================
+
+        const finalTags = [
+            ...(meta.tags || []),      // existing tags
+            ...(aiTags.tags || [])     // AI-generated tags
+        ]
+            .map(tag => String(tag).toLowerCase().trim())
+            .filter(Boolean)
+
+        // Remove duplicates & limit size
+        const uniqueTags = [...new Set(finalTags)].slice(0, 10)
+
+        // ============================================
+        // 💾 STEP 8: SAVE TO DATABASE
+        // ============================================
+
         const content = await contentModel.create({
             _id: contentObjectId,
+
             url: resolvedUrl,
             title: resolvedTitle,
             description: meta.description || "",
             summary: meta.description || "",
+
             image: meta.image || "",
             type: meta.type || "article",
-            tags: meta.tags || [],
+
+            // 🔥 AI-powered structure
+            tags: uniqueTags,
+            category: aiTags.category,
+            subCategory: aiTags.subCategory,
+
             userId,
+
+            // 🔗 Vector mapping
             contentId,
             textChunks: chunks,
             vectorReady,
             vectorIds,
         })
+        console.log("content saved successfully:->>",content);
+        
 
+        // ✅ SUCCESS RESPONSE
         return res.status(201).json({
             success: true,
             data: content,
         })
+
     } catch (error) {
+
+        // ============================================
+        // 🧹 CLEANUP: REMOVE VECTORS IF FAILED
+        // ============================================
+
         if (vectorIds.length) {
             try {
                 await deleteVectorsFromPinecone(vectorIds)
@@ -138,6 +205,9 @@ export async function uploadContentController(req, res) {
         // Extract raw text first because chunking, embeddings, and AI metadata all depend on it.
         const extractedFileContent = await extractFileContent(file)
         const text = normalizeExtractedText(extractedFileContent?.text)
+        // Generate hierarchical tags from the extracted text.
+        // The service falls back safely when OCR text is empty or the model fails.
+        const aiTags = await generateStructuredTags(text)
 
         // Build the user-facing title, description, and tags from OCR/PDF text plus file context.
         const uploadMetadata = await resolveUploadMetadata({
@@ -201,7 +271,9 @@ export async function uploadContentController(req, res) {
             description: uploadMetadata.description,
             summary: uploadMetadata.description,
             image: previewImage,
-            tags: uploadMetadata.tags,
+            tags: resolveUploadTags(aiTags?.tags, uploadMetadata.tags),
+            category: aiTags.category,
+            subCategory: aiTags.subCategory,
             type: uploadType,
             url: uploadedFile.url,
             textChunks: chunks,
@@ -536,4 +608,18 @@ function buildSavedContentIndexText({ title, description, tags, type, url }) {
         type ? `Type: ${type}` : "",
         url ? `Source URL: ${url}` : "",
     ].filter(Boolean).join("\n"))
+}
+
+// Prefers structured AI tags but falls back to the existing metadata tag pipeline when needed.
+// Input: structured tag array and the upload-metadata fallback tags.
+// Output: deduplicated tag array safe to save in MongoDB.
+function resolveUploadTags(structuredTags, fallbackTags) {
+    const normalizedTags = [
+        ...(Array.isArray(structuredTags) ? structuredTags : []),
+        ...(Array.isArray(fallbackTags) ? fallbackTags : []),
+    ]
+        .map(tag => String(tag || "").toLowerCase().trim())
+        .filter(Boolean)
+
+    return [...new Set(normalizedTags)].slice(0, 10)
 }
