@@ -1,8 +1,18 @@
+import mongoose from "mongoose"
 import contentModel from "../models/content.model.js"
+import { splitText } from "../services/chunk.service.js"
+import { generateEmbeddings } from "../services/embedding.service.js"
 import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
 import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
 import { uploadFileToImageKit } from "../services/upload.service.js"
+import {
+    buildVectorIds,
+    deleteVectorsFromPinecone,
+    storeVectorsInPinecone,
+} from "../services/vector.service.js"
+
+const minimumIndexableCharacters = 20
 
 // Saves URL-based content by scraping metadata from the target page.
 // Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
@@ -15,15 +25,24 @@ export async function saveContentController(req, res) {
             return res.status(400).json({ message: "URL is required" })
         }
 
+        // Fetch link metadata first so the saved card is immediately usable in the UI.
         const meta = await getMetadata(url)
+
+        // Generate a stable Mongo id up front so `contentId` is always available for future vector linking.
+        const contentObjectId = new mongoose.Types.ObjectId()
+        const contentId = contentObjectId.toString()
+        
         const content = await contentModel.create({
+            _id: contentObjectId,
             url,
             title: title || meta.title || "No title",
             description: meta.description || "",
+            summary: meta.description || "",
             image: meta.image || "",
             type: meta.type || "article",
             tags: meta.tags || [],
-            userId: req.user.id,
+            userId: String(req.user.id),
+            contentId,
         })
 
         return res.status(201).json({
@@ -40,10 +59,13 @@ export async function saveContentController(req, res) {
     }
 }
 
-// Uploads a PDF or image, extracts text, generates AI tags, and stores the result as saved content.
+// Uploads a PDF or image, extracts text, generates embeddings, stores vectors, uploads the file, and saves Mongo metadata.
 // Input: Express request with `req.file` from multer, optional `req.body.title`, and authenticated `req.user.id`.
 // Output: JSON response containing the created content document.
 export async function uploadContentController(req, res) {
+    // Keep track of stored vector ids so we can clean them up if a later step fails.
+    let vectorIds = []
+
     try {
         const file = req.file
 
@@ -57,9 +79,56 @@ export async function uploadContentController(req, res) {
             return res.status(400).json({ message: "Only PDF or image files are supported" })
         }
 
+        const userId = String(req.user.id)
+
+        // Create the Mongo id before vector storage so Pinecone metadata can point back to this document.
+        const contentObjectId = new mongoose.Types.ObjectId()
+        const contentId = contentObjectId.toString()
+
+        // Extract raw text first because chunking, embeddings, and AI metadata all depend on it.
         const extractedFileContent = await extractFileContent(file)
+        const text = normalizeExtractedText(extractedFileContent?.text)
+
+        // Build the user-facing title, description, and tags from OCR/PDF text plus file context.
+        const uploadMetadata = await resolveUploadMetadata({
+            manualTitle: req.body?.title,
+            originalName: file.originalname,
+            uploadType,
+            extractedText: text,
+            ocrConfidence: extractedFileContent?.ocrConfidence,
+        })
+
+        let chunks = []
+        let vectorReady = false
+
+        // Only vectorize files with enough readable text to be useful for semantic search.
+        if (hasIndexableText(text)) {
+            // Split large text into smaller retrieval-friendly chunks.
+            chunks = await splitText(text)
+
+            if (chunks.length) {
+                // Generate one embedding per chunk.
+                const embeddings = await generateEmbeddings(chunks)
+
+                // Store chunk vectors with Mongo mapping metadata.
+                vectorIds = await storeVectorsInPinecone({
+                    embeddings,
+                    chunks,
+                    metadata: {
+                        userId,
+                        title: uploadMetadata.title,
+                        contentId,
+                        type: uploadType,
+                    },
+                })
+
+                vectorReady = vectorIds.length === chunks.length
+            }
+        }
+
+        // Upload the original file after vector work succeeds so we do not keep orphan files on failed AI runs.
         const uploadedFile = await uploadFileToImageKit(file, {
-            userId: req.user.id,
+            userId,
             uploadType,
         })
 
@@ -67,22 +136,23 @@ export async function uploadContentController(req, res) {
             throw new Error("ImageKit did not return a public file URL")
         }
 
-        const uploadMetadata = await resolveUploadMetadata({
-            manualTitle: req.body?.title,
-            originalName: file.originalname,
-            uploadType,
-            extractedText: extractedFileContent.text,
-            ocrConfidence: extractedFileContent.ocrConfidence,
-        })
-
+        // Save the final content document with both UI metadata and vector mapping fields.
         const content = await contentModel.create({
-            userId: req.user.id,
+            _id: contentObjectId,
+            userId,
             title: uploadMetadata.title,
             description: uploadMetadata.description,
-            image: uploadType === "image" ? uploadedFile.url : uploadedFile.thumbnailUrl || "",
+            summary: uploadMetadata.description,
+            image: uploadType === "image"
+                ? uploadedFile.url
+                : uploadedFile.thumbnailUrl || "",
             tags: uploadMetadata.tags,
             type: uploadType,
             url: uploadedFile.url,
+            textChunks: chunks,
+            vectorReady,
+            contentId,
+            vectorIds,
         })
 
         return res.status(201).json({
@@ -90,6 +160,15 @@ export async function uploadContentController(req, res) {
             data: content,
         })
     } catch (error) {
+        // If Mongo/ImageKit fails after Pinecone succeeds, remove those vectors to avoid stale search records.
+        if (vectorIds.length) {
+            try {
+                await deleteVectorsFromPinecone(vectorIds)
+            } catch (cleanupError) {
+                console.error("Upload Vector Cleanup Error:", cleanupError.message)
+            }
+        }
+
         console.error("Upload Content Error:", error.message)
 
         const statusCode = resolveUploadErrorStatus(error)
@@ -107,10 +186,10 @@ export async function uploadContentController(req, res) {
 // Output: JSON response containing an array of content documents.
 export async function getContentAllController(req, res, next) {
     try {
-        const contents = await contentModel.find({ userId: req.user.id }).sort({ createdAt: -1 })
+        const contents = await contentModel.find({ userId: String(req.user.id) }).sort({ createdAt: -1 })
         return res.status(200).json({
             success: true,
-            data: contents
+            data: contents,
         })
     } catch (error) {
         console.error(error)
@@ -124,20 +203,37 @@ export async function getContentAllController(req, res, next) {
 export async function DeleteContentController(req, res, next) {
     try {
         const contentId = req.params.id
-        const deletedContent = await contentModel.findOneAndDelete({ _id: contentId, userId: req.user.id })
+        const deletedContent = await contentModel.findOneAndDelete({ _id: contentId, userId: String(req.user.id) })
+
         if (!deletedContent) {
             return res.status(404).json({ message: "Content not found or not authorized" })
         }
+
+        const storedVectorIds = deletedContent.vectorIds?.length
+            ? deletedContent.vectorIds
+            : deletedContent.contentId
+                ? buildVectorIds(deletedContent.contentId, deletedContent.textChunks?.length)
+                : []
+
+        // Delete the matching vectors as part of content cleanup.
+        if (storedVectorIds.length) {
+            try {
+                await deleteVectorsFromPinecone(storedVectorIds)
+            } catch (cleanupError) {
+                console.error("Delete Vector Cleanup Error:", cleanupError.message)
+            }
+        }
+
         return res.status(200).json({
             success: true,
             message: "Content deleted successfully",
-            data: deletedContent
+            data: deletedContent,
         })
     } catch (error) {
         console.error("Delete Content Error:", error.message)
         return res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message,
         })
     }
 }
@@ -147,17 +243,17 @@ export async function DeleteContentController(req, res, next) {
 // Output: JSON response containing an array of saved content documents.
 export async function getSingleUserContentController(req, res, next) {
     try {
-        const id = req.user.id
+        const id = String(req.user.id)
         const content = await contentModel.find({ userId: id }).sort({ createdAt: -1 })
         return res.status(200).json({
             success: true,
-            data: content
+            data: content,
         })
     } catch (error) {
         console.error("Get Single User Content Error:", error.message)
         return res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message,
         })
     }
 }
@@ -305,19 +401,12 @@ function resolveUploadErrorStatus(error) {
     const message = String(error?.message || "")
 
     if (
-        message.includes("Only PDF or image files are supported") ||
-        message.includes("File is required") ||
-        message.includes("Unsupported file type")
+        message.includes("Only PDF or image files are supported")
+        || message.includes("File is required")
+        || message.includes("Unsupported file type")
+        || message.includes("Search query is required")
     ) {
         return 400
-    }
-
-    if (
-        message.includes("IMAGEKIT_PRIVATE_KEY") ||
-        message.includes("ImageKit public key") ||
-        message.includes("Your account cannot be authenticated")
-    ) {
-        return 500
     }
 
     return 500
@@ -341,5 +430,33 @@ function resolveUploadErrorMessage(error) {
         return "Mistral API key is missing or invalid."
     }
 
+    if (message.includes("PINECONE_")) {
+        return "Pinecone is not configured correctly for vector storage."
+    }
+
+    if (message.includes("Pinecone")) {
+        return "Failed to store or clean up vectors in Pinecone."
+    }
+
     return "Failed to upload content"
+}
+
+// Normalizes extracted text before validation and chunking.
+// Input: raw OCR/PDF text.
+// Output: cleaned text string.
+function normalizeExtractedText(text) {
+    return String(text || "")
+        .replace(/\u0000/g, " ")
+        .replace(/\r/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
+}
+
+// Determines whether extracted text is substantial enough to embed and index.
+// Input: normalized extracted text.
+// Output: boolean indicating whether vectorization should proceed.
+function hasIndexableText(text) {
+    const normalizedText = normalizeExtractedText(text)
+    return normalizedText.length >= minimumIndexableCharacters
 }

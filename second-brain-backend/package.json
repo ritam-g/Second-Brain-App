@@ -8,6 +8,10 @@
 
     "@langchain/mistralai": "^1.0.7",
 
+    "@langchain/textsplitters": "^1.0.1",
+
+    "@pinecone-database/pinecone": "^7.1.0",
+
     "bcrypt": "^6.0.0",
 
     "bcryptjs": "^3.0.3",
@@ -23,6 +27,8 @@
     "express-validator": "^7.3.1",
 
     "jsonwebtoken": "^9.0.3",
+
+    "langchain": "^1.2.37",
 
     "mongoose": "^8.23.0",
 
