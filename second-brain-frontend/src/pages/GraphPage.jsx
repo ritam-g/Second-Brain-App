@@ -1,9 +1,9 @@
-import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { RefreshCcw, SearchX, Share2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import GraphView from '../components/graph/GraphView';
-import GraphNode from '../components/graph/GraphNode';
+import GraphCanvas from '../components/graph/GraphCanvas';
+import NodeDetailsPanel from '../components/graph/NodeDetailsPanel';
 import MainLayout from '../components/layout/MainLayout';
 import Button from '../components/ui/Button';
 import GlassCard from '../components/ui/GlassCard';
@@ -13,20 +13,19 @@ import { getGraphData } from '../redux/graphSlice';
 
 const graphCategories = ['All', 'Links', 'Documents', 'Images', 'Video', 'Social'];
 
-// Dedicated page for exploring semantic relationships between saved content items.
+// Dedicated route-level workspace for the semantic relationship graph.
 // Input: graph API data plus optional enriched content metadata from the user's library.
-// Output: interactive knowledge-graph workspace with filters, detail panel, and open-content action.
+// Output: stable graph canvas that only reacts to route navigation and explicit node/category interaction.
 const GraphPage = () => {
   const dispatch = useDispatch();
+  const MotionDiv = motion.div;
   const { user } = useSelector((state) => state.auth);
   const { nodes, edges, loading, error } = useSelector((state) => state.graph);
   const { items: contentItems } = useSelector((state) => state.content);
   const { getContent } = useGetContent();
   const { performLogout, loading: logoutLoading } = useLogout();
-  const [searchValue, setSearchValue] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedNodeId, setSelectedNodeId] = useState('');
-  const deferredSearchValue = useDeferredValue(searchValue);
 
   useEffect(() => {
     dispatch(getGraphData());
@@ -56,85 +55,81 @@ const GraphPage = () => {
     return entries;
   }, [contentItems]);
 
-  const filteredNodes = useMemo(() => {
-    const normalizedQuery = String(deferredSearchValue || '').trim().toLowerCase();
-
-    return nodes.filter((node) => {
-      const normalizedTitle = String(node?.title || '').toLowerCase();
-      const normalizedType = String(node?.type || '').toLowerCase();
-      const content = contentById.get(String(node?.id || '').trim());
-      const normalizedTags = Array.isArray(content?.tags)
-        ? content.tags.join(' ').toLowerCase()
-        : '';
-      const matchesQuery = !normalizedQuery
-        || normalizedTitle.includes(normalizedQuery)
-        || normalizedType.includes(normalizedQuery)
-        || normalizedTags.includes(normalizedQuery);
-      const matchesCategory = selectedCategory === 'All' || resolveGraphCategory(node) === selectedCategory;
-
-      return matchesQuery && matchesCategory;
-    });
-  }, [contentById, deferredSearchValue, nodes, selectedCategory]);
-
-  const filteredNodeIds = useMemo(
-    () => new Set(filteredNodes.map((node) => String(node?.id || '').trim()).filter(Boolean)),
-    [filteredNodes],
+  const normalizedGraph = useMemo(
+    () => normalizeGraphPayload({ nodes, edges }),
+    [edges, nodes],
   );
 
-  const filteredEdges = useMemo(
-    () => edges.filter((edge) => {
-      const sourceId = getLinkEndpointId(edge?.source);
-      const targetId = getLinkEndpointId(edge?.target);
+  const visibleNodes = useMemo(
+    () => normalizedGraph.nodes.filter((node) => (
+      selectedCategory === 'All' || resolveGraphCategory(node) === selectedCategory
+    )),
+    [normalizedGraph.nodes, selectedCategory],
+  );
 
-      return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
-    }),
-    [edges, filteredNodeIds],
+  const visibleNodeIds = useMemo(
+    () => new Set(visibleNodes.map((node) => node.id)),
+    [visibleNodes],
+  );
+
+  const visibleEdges = useMemo(
+    () => normalizedGraph.edges.filter((edge) => (
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    )),
+    [normalizedGraph.edges, visibleNodeIds],
   );
 
   useEffect(() => {
-    if (!filteredNodes.length) {
+    if (!visibleNodes.length) {
       setSelectedNodeId('');
       return;
     }
 
-    const hasSelectedNode = filteredNodes.some((node) => String(node?.id || '') === selectedNodeId);
+    const hasSelectedNode = visibleNodes.some((node) => node.id === selectedNodeId);
 
     if (!hasSelectedNode) {
-      setSelectedNodeId(resolvePreferredNodeId(filteredNodes, filteredEdges));
+      setSelectedNodeId(resolvePreferredNodeId(visibleNodes, visibleEdges));
     }
-  }, [filteredEdges, filteredNodes, selectedNodeId]);
+  }, [selectedNodeId, visibleEdges, visibleNodes]);
 
-  const selectedNode = filteredNodes.find((node) => String(node?.id || '') === selectedNodeId) || null;
-  const selectedContent = selectedNode ? contentById.get(String(selectedNode.id || '').trim()) || null : null;
+  const selectedNode = useMemo(
+    () => visibleNodes.find((node) => node.id === selectedNodeId) || null,
+    [selectedNodeId, visibleNodes],
+  );
+  const selectedContent = selectedNode ? contentById.get(selectedNode.id) || null : null;
   const relatedNodes = useMemo(
-    () => resolveRelatedNodes({ selectedNode, nodes: filteredNodes, edges: filteredEdges }),
-    [filteredEdges, filteredNodes, selectedNode],
+    () => resolveRelatedNodes({
+      edges: visibleEdges,
+      nodes: visibleNodes,
+      selectedNode,
+    }),
+    [selectedNode, visibleEdges, visibleNodes],
   );
   const strongestRelation = relatedNodes.length ? relatedNodes[0].weight : null;
-  const hasInitialLoadingState = loading && !nodes.length;
-  const hasNoGraph = !loading && !error && !nodes.length;
-  const hasNoMatches = !loading && filteredNodes.length === 0 && nodes.length > 0;
+  const hasInitialLoadingState = loading && !normalizedGraph.nodes.length;
+  const hasNoGraph = !loading && !error && !normalizedGraph.nodes.length;
+  const hasNoMatches = !loading && !error && normalizedGraph.nodes.length > 0 && !visibleNodes.length;
 
   return (
     <MainLayout
       user={user}
-      searchValue={searchValue}
-      onSearchChange={setSearchValue}
-      categories={graphCategories}
-      selectedCategory={selectedCategory}
-      onCategoryChange={setSelectedCategory}
+      searchValue=""
+      onSearchChange={() => {}}
+      showSearch={false}
+      categories={[]}
+      selectedCategory=""
+      onCategoryChange={() => {}}
       onPrimaryAction={() => dispatch(getGraphData())}
       onLogout={performLogout}
       logoutLoading={logoutLoading}
-      searchPlaceholder="Search graph nodes by title, type, or tags..."
-      rightMetaLabel={`${filteredNodes.length} nodes | ${filteredEdges.length} links | semantic relationship view`}
+      rightMetaLabel={`${visibleNodes.length} nodes | ${visibleEdges.length} links | semantic relationship view`}
     >
       <section className="flex flex-col gap-6">
-        <motion.div
+        <MotionDiv
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"
+          className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between"
         >
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-accent-soft">
@@ -147,7 +142,7 @@ const GraphPage = () => {
                 Semantic Relationship Engine
               </h1>
               <p className="pb-1 text-sm text-obsidian-500">
-                showing {filteredNodes.length} of {nodes.length} nodes
+                showing {visibleNodes.length} of {normalizedGraph.nodes.length} nodes
               </p>
             </div>
 
@@ -162,13 +157,30 @@ const GraphPage = () => {
               variant="surface"
               className="rounded-2xl px-5 py-3"
               leadingIcon={<RefreshCcw className="h-4 w-4" />}
-              loading={loading && !!nodes.length}
+              loading={loading && !!normalizedGraph.nodes.length}
               onClick={() => dispatch(getGraphData())}
             >
               Refresh Graph
             </Button>
           </div>
-        </motion.div>
+        </MotionDiv>
+
+        <div className="obsidian-scroll flex gap-2 overflow-x-auto pb-1">
+          {graphCategories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setSelectedCategory(category)}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                selectedCategory === category
+                  ? 'bg-[rgba(248,174,29,0.14)] text-accent'
+                  : 'text-obsidian-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-obsidian-300'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
 
         {error ? (
           <GlassCard className="flex flex-col gap-4 px-5 py-4 text-sm text-obsidian-400 sm:flex-row sm:items-center sm:justify-between">
@@ -194,32 +206,35 @@ const GraphPage = () => {
           />
         ) : hasNoMatches ? (
           <GraphEmptyState
-            title="No nodes match the current filters"
-            description="Try a broader search term or switch the graph category to reveal a wider part of your archive."
+            title="No nodes match the current category"
+            description="Switch the graph category to reveal a wider part of your archive."
           />
         ) : (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)]">
             <GlassCard className="relative min-h-[40rem] overflow-hidden p-2">
-              <GraphView
-                nodes={filteredNodes}
-                edges={filteredEdges}
+              <GraphCanvas
+                nodes={visibleNodes}
+                edges={visibleEdges}
                 selectedNodeId={selectedNodeId}
-                onNodeSelect={(node) => setSelectedNodeId(String(node?.id || ''))}
+                onNodeSelect={(node) => {
+                  setSelectedNodeId(String(node?.id || ''));
+                }}
               />
             </GlassCard>
 
-            <motion.div
+            <MotionDiv
               key={selectedNodeId || 'empty-selection'}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: 'easeOut' }}
             >
-              <GraphNode
+              <NodeDetailsPanel
                 node={selectedNode}
                 content={selectedContent}
                 relatedNodes={relatedNodes}
                 relationCount={relatedNodes.length}
                 strongestRelation={strongestRelation}
+                onSelectRelatedNode={(nodeId) => setSelectedNodeId(String(nodeId || ''))}
                 onOpenContent={() => {
                   const destinationUrl = String(selectedContent?.url || '').trim();
 
@@ -228,7 +243,7 @@ const GraphPage = () => {
                   }
                 }}
               />
-            </motion.div>
+            </MotionDiv>
           </div>
         )}
       </section>
@@ -267,6 +282,71 @@ function GraphEmptyState({ title, description }) {
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-obsidian-400">{description}</p>
     </GlassCard>
   );
+}
+
+function normalizeGraphPayload({ nodes, edges }) {
+  const nodesById = new Map();
+
+  (Array.isArray(nodes) ? nodes : []).forEach((node) => {
+    const normalizedNode = normalizeGraphNode(node);
+
+    if (!normalizedNode || nodesById.has(normalizedNode.id)) {
+      return;
+    }
+
+    nodesById.set(normalizedNode.id, normalizedNode);
+  });
+
+  const edgesById = new Map();
+
+  (Array.isArray(edges) ? edges : []).forEach((edge) => {
+    const sourceId = getLinkEndpointId(edge?.source);
+    const targetId = getLinkEndpointId(edge?.target);
+
+    if (!sourceId || !targetId || sourceId === targetId) {
+      return;
+    }
+
+    if (!nodesById.has(sourceId) || !nodesById.has(targetId)) {
+      return;
+    }
+
+    const [firstId, secondId] = sourceId < targetId
+      ? [sourceId, targetId]
+      : [targetId, sourceId];
+    const edgeId = `${firstId}::${secondId}`;
+    const weight = Math.max(0, Math.min(1, Number(edge?.weight) || 0));
+    const existingEdge = edgesById.get(edgeId);
+
+    if (!existingEdge || weight > existingEdge.weight) {
+      edgesById.set(edgeId, {
+        id: edgeId,
+        source: sourceId,
+        target: targetId,
+        weight,
+      });
+    }
+  });
+
+  return {
+    nodes: Array.from(nodesById.values()),
+    edges: Array.from(edgesById.values()),
+  };
+}
+
+function normalizeGraphNode(node) {
+  const id = String(node?.id || '').trim();
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    title: String(node?.title || 'Untitled Content').trim() || 'Untitled Content',
+    image: String(node?.image || '').trim(),
+    type: String(node?.type || 'document').trim() || 'document',
+  };
 }
 
 function resolveGraphCategory(node) {
@@ -309,11 +389,10 @@ function resolvePreferredNodeId(nodes, edges) {
   });
 
   let preferredNode = nodes[0] || null;
-  let preferredScore = preferredNode ? scores.get(String(preferredNode.id || '')) || 0 : -1;
+  let preferredScore = preferredNode ? scores.get(preferredNode.id) || 0 : -1;
 
   nodes.forEach((node) => {
-    const nodeId = String(node?.id || '');
-    const nextScore = scores.get(nodeId) || 0;
+    const nextScore = scores.get(node.id) || 0;
 
     if (nextScore > preferredScore) {
       preferredNode = node;
@@ -329,10 +408,7 @@ function resolveRelatedNodes({ selectedNode, nodes, edges }) {
     return [];
   }
 
-  const nodesById = new Map(
-    nodes.map((node) => [String(node?.id || ''), node]),
-  );
-  const selectedNodeId = String(selectedNode.id || '');
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const relationships = [];
 
   edges.forEach((edge) => {
@@ -340,11 +416,11 @@ function resolveRelatedNodes({ selectedNode, nodes, edges }) {
     const targetId = getLinkEndpointId(edge?.target);
     const weight = Number(edge?.weight) || 0;
 
-    if (sourceId !== selectedNodeId && targetId !== selectedNodeId) {
+    if (sourceId !== selectedNode.id && targetId !== selectedNode.id) {
       return;
     }
 
-    const relatedId = sourceId === selectedNodeId ? targetId : sourceId;
+    const relatedId = sourceId === selectedNode.id ? targetId : sourceId;
     const relatedNode = nodesById.get(relatedId);
 
     if (!relatedNode) {
@@ -352,9 +428,9 @@ function resolveRelatedNodes({ selectedNode, nodes, edges }) {
     }
 
     relationships.push({
-      id: String(relatedNode.id || ''),
-      title: String(relatedNode.title || 'Untitled Content'),
-      type: String(relatedNode.type || ''),
+      id: relatedNode.id,
+      title: relatedNode.title,
+      type: relatedNode.type,
       weight,
       weightLabel: `${Math.round(Math.max(0, Math.min(1, weight)) * 100)}%`,
     });
@@ -365,10 +441,10 @@ function resolveRelatedNodes({ selectedNode, nodes, edges }) {
 
 function getLinkEndpointId(endpoint) {
   if (typeof endpoint === 'object' && endpoint !== null) {
-    return String(endpoint.id || '');
+    return String(endpoint.id || '').trim();
   }
 
-  return String(endpoint || '');
+  return String(endpoint || '').trim();
 }
 
 export default GraphPage;

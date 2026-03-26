@@ -12,6 +12,7 @@ const MainLayout = ({
   user,
   searchValue,
   onSearchChange,
+  showSearch = true,
   categories = [],
   selectedCategory,
   onCategoryChange,
@@ -99,6 +100,7 @@ const MainLayout = ({
           user={user}
           searchValue={searchValue}
           onSearchChange={onSearchChange}
+          showSearch={showSearch}
           categories={categories}
           selectedCategory={selectedCategory}
           onCategoryChange={onCategoryChange}

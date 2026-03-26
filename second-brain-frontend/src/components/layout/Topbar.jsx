@@ -11,6 +11,7 @@ const Topbar = ({
   user,
   searchValue,
   onSearchChange,
+  showSearch = true,
   categories = [],
   selectedCategory,
   onCategoryChange,
@@ -48,15 +49,19 @@ const Topbar = ({
               aria-label="Toggle sidebar"
             />
 
-            <div className="min-w-0 flex-1">
-              <Input
-                value={searchValue}
-                onChange={(event) => onSearchChange(event.target.value)}
-                placeholder={searchPlaceholder}
-                icon={Search}
-                className="w-full"
-              />
-            </div>
+            {showSearch ? (
+              <div className="min-w-0 flex-1">
+                <Input
+                  value={searchValue || ''}
+                  onChange={(event) => onSearchChange?.(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  icon={Search}
+                  className="w-full"
+                />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
 
             <div className="hidden items-center gap-2 md:flex">
               <Button variant="icon" leadingIcon={<Bell className="h-4 w-4" />} aria-label="Notifications" />
