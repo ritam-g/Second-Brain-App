@@ -64,7 +64,7 @@ app.use(express.static(frontendDistPath))
 
 // Catch-all: Send index.html for any request that doesn't match an API route.
 // This allows React Router (SPA) to handle the routing internally.
-app.get('*', (req, res) => {
+app.get('*any', (req, res) => {
     // Only serve index.html for non-API routes
     if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(frontendDistPath, 'index.html'))
