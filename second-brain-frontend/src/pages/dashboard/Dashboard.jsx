@@ -359,7 +359,7 @@ const Dashboard = () => {
       onPrimaryAction={() => saveInputRef.current?.focus()}
       onLogout={performLogout}
       logoutLoading={logoutLoading}
-      searchPlaceholder="Search with AI across PDFs, OCR, and saved content..."
+      searchPlaceholder="Search by title, tags, or semantic meaning..."
     >
       <div
         className="dashboard-page debug-dashboard-page"

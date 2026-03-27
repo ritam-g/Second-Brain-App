@@ -1,7 +1,8 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCcw, Search, SearchX, Share2, X } from 'lucide-react';
+import { Maximize2, RefreshCcw, Search, SearchX, Share2, X } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import GraphCanvas from '../features/graph/components/GraphCanvas';
 import NodeDetailsPanel from '../features/graph/components/NodeDetailsPanel';
 import MainLayout from '../components/layout/MainLayout';
@@ -22,6 +23,7 @@ const graphCategories = ['All', 'Links', 'Documents', 'Images', 'Video', 'Social
 const GraphPage = () => {
   const dispatch = useDispatch();
   const MotionDiv = motion.div;
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const { nodes, edges, loading, error } = useSelector((state) => state.graph);
   const { items: contentItems } = useSelector((state) => state.content);
@@ -151,6 +153,18 @@ const GraphPage = () => {
       ? `Focused on ${searchMatches[0].title}`
       : `No nodes found for "${searchQuery.trim()}"`
     : `${visibleNodes.length} nodes ready to explore`;
+  const graphRouteSearchString = buildGraphRouteSearch({
+    category: selectedCategory,
+    nodeId: selectedNodeId,
+    searchQuery,
+  }).toString();
+
+  const handleOpenFullscreen = () => {
+    navigate({
+      pathname: '/graph/fullscreen',
+      search: graphRouteSearchString ? `?${graphRouteSearchString}` : '',
+    });
+  };
 
   return (
     <MainLayout
@@ -228,6 +242,15 @@ const GraphPage = () => {
               onClick={() => dispatch(getGraphData())}
             >
               Refresh Graph
+            </Button>
+            <Button
+              type="button"
+              variant="surface"
+              className="rounded-2xl px-5 py-3"
+              leadingIcon={<Maximize2 className="h-4 w-4" />}
+              onClick={handleOpenFullscreen}
+            >
+              Open Full Graph
             </Button>
           </div>
         </MotionDiv>
@@ -569,6 +592,29 @@ function normalizeSearchQuery(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+function buildGraphRouteSearch({ category, nodeId, searchQuery }) {
+  const nextSearchParams = new URLSearchParams();
+  const normalizedCategory = graphCategories.includes(String(category || '').trim())
+    ? String(category || '').trim()
+    : 'All';
+  const normalizedNodeId = String(nodeId || '').trim();
+  const normalizedSearch = String(searchQuery || '').trim();
+
+  if (normalizedCategory !== 'All') {
+    nextSearchParams.set('category', normalizedCategory);
+  }
+
+  if (normalizedNodeId) {
+    nextSearchParams.set('node', normalizedNodeId);
+  }
+
+  if (normalizedSearch) {
+    nextSearchParams.set('q', normalizedSearch);
+  }
+
+  return nextSearchParams;
 }
 
 export default GraphPage;

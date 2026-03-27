@@ -8,6 +8,7 @@ import { ProtectedRoute, PublicRoute } from './RouteGuards';
 import RouteLoadingFallback from './RouteLoadingFallback';
 
 const GraphPage = lazy(() => import('../pages/GraphPage'));
+const GraphFullscreenPage = lazy(() => import('../pages/GraphFullscreenPage'));
 
 // BENEFIT of utilizing User and Loading states:
 // By using `loading`, we prevent a UX issue called "hydration flicker" where an authenticated user 
@@ -59,6 +60,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <Suspense fallback={<RouteLoadingFallback />}>
           <GraphPage />
+        </Suspense>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/graph/fullscreen',
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <GraphFullscreenPage />
         </Suspense>
       </ProtectedRoute>
     ),
