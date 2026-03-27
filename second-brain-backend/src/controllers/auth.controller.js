@@ -1,6 +1,18 @@
 import jwt from "jsonwebtoken"
 import userModel from "../models/user.model.js"
 
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Cookie options adapt to environment.
+// Production (Render HTTPS): secure + sameSite=none required for cross-origin credentialed requests.
+// Development (HTTP localhost): secure=false, sameSite=lax is enough.
+const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+}
+
 export async function registerController(req, res, next) {
     try {
         const { username, password, email } = req.body
@@ -50,7 +62,7 @@ export async function userLoginController(req, res, next) {
             return res.status(401).json({ message: "Invalid credentials" })
         }
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' })
-        res.cookie("jwtToken", token, { httpOnly: true })
+        res.cookie("jwtToken", token, cookieOptions)
         
         return res.status(200).json({ 
             success: true,
@@ -89,7 +101,7 @@ export async function checkAuthController(req, res, next) {
 
 export async function logoutController(req, res, next) {
     try {
-        res.clearCookie("jwtToken", { httpOnly: true, sameSite: 'lax' });
+        res.clearCookie("jwtToken", cookieOptions);
         return res.status(200).json({
             success: true,
             message: "Logged out successfully"

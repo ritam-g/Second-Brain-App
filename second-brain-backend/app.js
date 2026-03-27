@@ -8,15 +8,22 @@ import ragRouter from './src/routes/rag.routes.js'
 import graphRouter from './src/routes/graph.routes.js'
 import resurfacingRouter from './src/routes/resurfacing.routes.js'
 
+const isProduction = process.env.NODE_ENV === 'production'
+
+// CORS origin is driven by env var so the same codebase works locally and on Render.
+// In production: set CORS_ORIGIN to your Render static site URL (e.g. https://second-brain.onrender.com)
+// In development: falls back to the Vite dev server default.
+const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173'
 
 const app = express()
 
-// middleware
 app.use(express.json())
 app.use(cookieParser())
 app.use(cors({
-    origin: "http://localhost:5173",
-    credentials: true
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 
 

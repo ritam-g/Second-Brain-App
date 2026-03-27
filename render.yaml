@@ -1,0 +1,58 @@
+services:
+  # ─────────────────────────────────────────────────────
+  # 1. BACKEND — Render Web Service (Node.js)
+  # ─────────────────────────────────────────────────────
+  - type: web
+    name: second-brain-backend
+    runtime: node
+    rootDir: second-brain-backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # ── Set these in Render Dashboard > Environment ──
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_EMBEDDING_MODEL
+        value: mistral-embed
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        sync: false
+      - key: PINECONE_HOST
+        sync: false
+      - key: IMAGEKIT_PUBLIC_KEY
+        sync: false
+      - key: IMAGEKIT_PRIVATE_KEY
+        sync: false
+      - key: IMAGEKIT_URL_ENDPOINT
+        sync: false
+      # ── Replace with your actual Render static site URL after deploying frontend ──
+      - key: CORS_ORIGIN
+        sync: false
+
+  # ─────────────────────────────────────────────────────
+  # 2. FRONTEND — Render Static Site (Vite dist)
+  # ─────────────────────────────────────────────────────
+  - type: web
+    name: second-brain-frontend
+    runtime: static
+    rootDir: second-brain-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      # SPA fallback: all routes serve index.html so React Router works
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # ── Replace with your actual Render backend URL after deploying backend ──
+      - key: VITE_API_URL
+        sync: false
