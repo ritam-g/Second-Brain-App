@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { getResurfacedController } from "../controllers/resurfacing.controller.js"
-import { AuthMiddleware } from "../middlewares/auth.middleware.js"
+import { AuthMiddleware } from "../middleware/auth_middleware.js"
 
 const resurfacingRouter = Router()
 

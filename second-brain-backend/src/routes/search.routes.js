@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { semanticSearchController } from "../controllers/search.controller.js"
-import { AuthMiddleware } from "../middlewares/auth.middleware.js"
+import { AuthMiddleware } from "../middleware/auth_middleware.js"
 
 const searchRouter = Router()
 
