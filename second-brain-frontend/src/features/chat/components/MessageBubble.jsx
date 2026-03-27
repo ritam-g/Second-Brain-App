@@ -1,7 +1,7 @@
 import React from 'react';
 import clsx from 'clsx';
 import { Bot, UserRound } from 'lucide-react';
-import ChatAnswer from './chat/ChatAnswer';
+import ChatAnswer from './ChatAnswer';
 
 // Individual chat bubble used inside Deep Focus conversations.
 // Input: role, message text, optional retrieval sources, and timestamp.

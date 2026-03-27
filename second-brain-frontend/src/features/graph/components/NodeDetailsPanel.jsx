@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, Link2, Share2, Sparkles } from 'lucide-react';
-import GlassCard from '../ui/GlassCard';
-import Button from '../ui/Button';
+import GlassCard from '../../../components/ui/GlassCard';
+import Button from '../../../components/ui/Button';
 
 /**
  * NodeDetailsPanel Component

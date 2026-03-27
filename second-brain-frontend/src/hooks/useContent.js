@@ -2,8 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
 import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi, semanticSearchContentApi } from '../api/content.api';
-import { getApiErrorMessage } from '../lib/api-error';
-import { notify } from '../lib/toast';
+import { getApiErrorMessage } from '../utils/api-error';
+import { notify } from '../utils/toast';
 
 export const useGetContent = () => {
   const dispatch = useDispatch();

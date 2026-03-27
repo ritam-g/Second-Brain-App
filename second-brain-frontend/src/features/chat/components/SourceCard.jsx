@@ -1,7 +1,7 @@
 import React from 'react';
 import { CalendarDays, ExternalLink } from 'lucide-react';
-import ContentPreview from '../ContentPreview';
-import { getSavedTimeLabel } from '../content/utils';
+import ContentPreview from '../../../components/content/ContentPreview';
+import { getSavedTimeLabel } from '../../../components/content/utils';
 
 // Individual source citation card for assistant answers.
 // Input: a normalized source object containing preview, title, type, and link metadata.

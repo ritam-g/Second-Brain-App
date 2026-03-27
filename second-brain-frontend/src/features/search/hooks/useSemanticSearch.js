@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { semanticSearchService } from '../services/searchService';
-import { getApiErrorMessage } from '../lib/api-error';
+import { semanticSearchService } from '../search.service';
+import { getApiErrorMessage } from '../../../utils/api-error';
 
 // Drives API-first semantic search with optional debounced auto-search behavior.
 // Input: configuration for debounce timing, result count, and auto-search mode.

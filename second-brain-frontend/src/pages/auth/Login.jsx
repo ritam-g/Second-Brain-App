@@ -4,7 +4,7 @@ import { BrainCircuit } from 'lucide-react';
 import { useLogin } from '../../hooks/useAuth';
 import Button from '../../components/ui/Button';
 import InputField from '../../components/ui/InputField';
-import { notify } from '../../lib/toast';
+import { notify } from '../../utils/toast';
 
 const Login = () => {
   const [email, setEmail] = useState('');

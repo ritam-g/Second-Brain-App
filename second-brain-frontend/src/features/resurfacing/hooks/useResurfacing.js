@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchResurfaced } from '../../api/resurfacing.api';
-import { getApiErrorMessage } from '../../lib/api-error';
+import { fetchResurfaced } from '../../../api/resurfacing.api';
+import { getApiErrorMessage } from '../../../utils/api-error';
 
 // Fetches one resurfacing time window for the dashboard memory feature.
 // Input: month offset integer.

@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowRight, Link2 } from 'lucide-react';
-import GlassCard from '../ui/GlassCard';
-import Input from '../ui/Input';
-import Button from '../ui/Button';
+import GlassCard from '../../../components/ui/GlassCard';
+import Input from '../../../components/ui/Input';
+import Button from '../../../components/ui/Button';
 
 // Save link entry panel shown at the top of the dashboard.
 // Input: link value, loading state, submit handler, and change handler.

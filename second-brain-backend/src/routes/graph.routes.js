@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { getGraphController } from "../controllers/graph.controller.js"
-import { AuthMiddleware } from "../middlewares/auth.Middleware.js"
+import { AuthMiddleware } from "../middlewares/auth.middleware.js"
 
 const graphRouter = Router()
 

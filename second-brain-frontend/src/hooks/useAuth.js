@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess, logout, setAuthLoading } from '../redux/slices/authSlice';
 import { loginUserApi, registerUserApi, checkAuthApi, logoutApi } from '../api/auth.api';
-import { getApiErrorMessage } from '../lib/api-error';
-import { notify } from '../lib/toast';
+import { getApiErrorMessage } from '../utils/api-error';
+import { notify } from '../utils/toast';
 
 // BENEFIT of useAuthCheck: 
 // Runs exactly once when the application mounts (inside App.jsx). It asks the backend if the secure cookie is valid.

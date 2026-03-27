@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { ExternalLink, FileText, ImageIcon, PlayCircle } from 'lucide-react';
-import { getFallbackImage, getPreviewImage, getPreviewType } from './content/utils/contentPreview.utils';
+import { getFallbackImage, getPreviewImage, getPreviewType } from './utils/contentPreview.utils';
 
 // Reusable preview surface for semantic search results and deep-focus citations.
 // Input: content-like object with `type`, `image`, and `url`, plus optional sizing props.

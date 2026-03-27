@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import MasonryGrid from '../../components/content/MasonryGrid';
-import ContentCard from '../../components/content/ContentCard';
-import { normalizeContentCollection } from '../../components/content/utils';
-import { useResurfacing } from './useResurfacing';
+import MasonryGrid from '../../../components/content/MasonryGrid';
+import ContentCard from '../../../components/content/ContentCard';
+import { normalizeContentCollection } from '../../../components/content/utils';
+import { useResurfacing } from '../hooks/useResurfacing';
 
 /**
  * ResurfacingSection Component

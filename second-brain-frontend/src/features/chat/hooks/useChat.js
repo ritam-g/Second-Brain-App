@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { askAI } from '../api/ragApi';
-import { getApiErrorMessage } from '../lib/api-error';
+import { askAI } from '../../../api/rag.api';
+import { getApiErrorMessage } from '../../../utils/api-error';
 
 const defaultWelcomeMessages = [
   {

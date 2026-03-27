@@ -2,19 +2,19 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCcw, SearchX, Sparkles } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import MainLayout from '../../components/layout/MainLayout';
-import SaveLinkPanel from '../../components/features/SaveLinkPanel';
-import UploadPanel from '../../components/features/UploadPanel';
+import SaveLinkPanel from '../../features/content-ingest/components/SaveLinkPanel';
+import UploadPanel from '../../features/content-ingest/components/UploadPanel';
 import MasonryGrid from '../../components/content/MasonryGrid';
 import ContentCard from '../../components/content/ContentCard';
 import TagChip from '../../components/content/TagChip';
 import { normalizeContentCollection } from '../../components/content/utils';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
-import ResurfacingSection from '../../features/resurfacing/ResurfacingSection';
+import ResurfacingSection from '../../features/resurfacing/components/ResurfacingSection';
 import { useGetContent, useSaveContent, useFilteredContent, useUploadContent } from '../../hooks/useContent';
 import { useLogout } from '../../hooks/useAuth';
-import { useSemanticSearch } from '../../hooks/useSemanticSearch';
-import { notify } from '../../lib/toast';
+import { useSemanticSearch } from '../../features/search/hooks/useSemanticSearch';
+import { notify } from '../../utils/toast';
 
 const dashboardCategories = ['All', 'Links', 'Documents', 'Images', 'Video', 'Social'];
 

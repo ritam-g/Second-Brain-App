@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowUp, MessagesSquare } from 'lucide-react';
-import GlassCard from './ui/GlassCard';
-import Button from './ui/Button';
+import GlassCard from '../../../components/ui/GlassCard';
+import Button from '../../../components/ui/Button';
 import MessageBubble from './MessageBubble';
 
 // Scrollable chat interface for Deep Focus retrieval conversations.

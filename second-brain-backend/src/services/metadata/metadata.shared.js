@@ -1,4 +1,4 @@
-import { cleanTitle } from "../../utils/CleanTitle.js"
+import { cleanTitle } from "../../utils/clean-title.js"
 
 const maxMetadataTitleCharacters = 80
 const maxMetadataDescriptionCharacters = 180

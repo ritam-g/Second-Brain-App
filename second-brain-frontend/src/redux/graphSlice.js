@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { fetchGraphData } from '../api/graph.api';
-import { getApiErrorMessage } from '../lib/api-error';
+import { getApiErrorMessage } from '../utils/api-error';
 
 export const getGraphData = createAsyncThunk(
   'graph/fetch',

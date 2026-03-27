@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { registerController, userLoginController, checkAuthController, logoutController } from '../controllers/auth.controller.js'
-import { AuthMiddleware } from '../middlewares/auth.Middleware.js'
+import { AuthMiddleware } from '../middlewares/auth.middleware.js'
 
 /**   
  * @swagger

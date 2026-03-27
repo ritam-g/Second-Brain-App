@@ -4,7 +4,7 @@ import { BrainCircuit } from 'lucide-react';
 import { useRegister } from '../../hooks/useAuth';
 import Button from '../../components/ui/Button';
 import InputField from '../../components/ui/InputField';
-import { notify } from '../../lib/toast';
+import { notify } from '../../utils/toast';
 
 const Register = () => {
   const [username, setUsername] = useState('');

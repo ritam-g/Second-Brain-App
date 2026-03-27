@@ -7,7 +7,7 @@ import {
     saveContentController,
     uploadContentController,
 } from "../controllers/content.controller.js"
-import { AuthMiddleware } from "../middlewares/auth.Middleware.js"
+import { AuthMiddleware } from "../middlewares/auth.middleware.js"
 import { upload } from "../middlewares/upload.middleware.js"
 
 const contentRouter = Router()

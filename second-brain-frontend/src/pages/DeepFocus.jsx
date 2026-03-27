@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { notify } from '../lib/toast';
+import { notify } from '../utils/toast';
 import MainLayout from '../components/layout/MainLayout';
-import ChatBox from '../components/ChatBox';
+import ChatBox from '../features/chat/components/ChatBox';
 import { useLogout } from '../hooks/useAuth';
-import { useChat } from '../hooks/useChat';
+import { useChat } from '../features/chat/hooks/useChat';
 
 // Deep Focus is the dedicated RAG chat surface for asking grounded questions against the user's archive.
 // Input: authenticated user session plus backend RAG responses.

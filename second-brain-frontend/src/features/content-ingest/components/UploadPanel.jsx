@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowRight, FileImage, FileText, Upload } from 'lucide-react';
-import GlassCard from '../ui/GlassCard';
-import Input from '../ui/Input';
-import Button from '../ui/Button';
+import GlassCard from '../../../components/ui/GlassCard';
+import Input from '../../../components/ui/Input';
+import Button from '../../../components/ui/Button';
 
 // File upload entry panel shown next to the link panel in the dashboard header.
 // Input: selected file state, optional title, loading state, and upload form handlers.

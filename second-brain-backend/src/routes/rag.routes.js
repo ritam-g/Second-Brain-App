@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { ragQueryController } from "../controllers/rag.controller.js"
-import { AuthMiddleware } from "../middlewares/auth.Middleware.js"
+import { AuthMiddleware } from "../middlewares/auth.middleware.js"
 
 const ragRouter = Router()
 
