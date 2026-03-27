@@ -19,7 +19,13 @@ export async function semanticSearchController(req, res) {
             userId: String(req.user.id),
             topK: normalizeRetrievalTopK(req.body?.topK),
         })
-
+        if (!matches) {
+            return res.status(404).json({
+                success: false,
+                message: "No matches found",
+            })
+        }
+        
         return res.status(200).json({
             success: true,
             data: matches,

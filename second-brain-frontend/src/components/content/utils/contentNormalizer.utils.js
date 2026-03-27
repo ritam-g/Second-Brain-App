@@ -96,6 +96,11 @@ export function normalizeContentItem(item, { context = 'default', index = 0 } = 
     metadata.text,
     rawItem.matchedChunkText,
   );
+  const descriptionLanguage = getFirstNonEmptyString(
+    item.descriptionLanguage,
+    metadata.descriptionLanguage,
+    rawItem.descriptionLanguage,
+  );
   const tags = normalizeTags(item.tags ?? metadata.tags ?? rawItem.tags);
 
   return {
@@ -111,12 +116,14 @@ export function normalizeContentItem(item, { context = 'default', index = 0 } = 
     type,
     createdAt,
     matchedChunkText,
+    descriptionLanguage,
     tags,
     metadata: {
       ...metadata,
       contentId: deleteId,
       title,
       description,
+      descriptionLanguage,
       image,
       url,
       type,

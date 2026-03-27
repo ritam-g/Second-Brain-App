@@ -17,6 +17,7 @@ import {
   getCardLabel,
   getCardVariant,
   getContentKind,
+  getDescriptionLabel,
   getDestinationUrl,
   getDisplayDescription,
   getDisplayTags,
@@ -47,6 +48,7 @@ const ContentCard = ({ content, index }) => {
   const destinationUrl = getDestinationUrl(content);
   const displayTitle = getDisplayTitle(content);
   const displayDescription = getDisplayDescription(content);
+  const descriptionLabel = getDescriptionLabel(content);
   const displayTags = getDisplayTags(content);
   const cardLabel = getCardLabel(content);
   const typeBadge = getTypeBadge(content);
@@ -93,6 +95,7 @@ const ContentCard = ({ content, index }) => {
       data-debug="content-card"
       data-id={content?._id || ''}
       data-type={content?.type || previewType || 'unknown'}
+      data-description-language={content?.descriptionLanguage || ''}
       data-variant={variant}
       data-preview-type={previewType}
     >
@@ -144,9 +147,17 @@ const ContentCard = ({ content, index }) => {
         </h3>
 
         <p
-          className="content-description debug-content-description mt-3 text-sm leading-7 text-obsidian-400"
+          className="content-description-label debug-content-description-label mt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-obsidian-500"
+          data-debug="content-description-label"
+        >
+          {descriptionLabel}
+        </p>
+
+        <p
+          className="content-description debug-content-description mt-2 break-words text-sm leading-7 text-obsidian-400"
           data-debug="content-description"
-          style={getLineClampStyle(kind === 'document' ? 3 : 4)}
+          style={getLineClampStyle(3)}
+          title={displayDescription}
         >
           {displayDescription}
         </p>

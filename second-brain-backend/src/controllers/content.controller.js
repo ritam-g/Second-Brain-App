@@ -8,6 +8,7 @@ import { detectUploadFileType, extractFileContent } from "../services/extract.se
 import { getMetadata } from "../services/metadata.service.js"
 import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
 import { deleteFileFromImageKit, uploadFileToImageKit } from "../services/upload.service.js"
+import { isYouTubeUrl, normalizeYouTubeUrl } from "../utils/youtube.util.js"
 import {
     buildVectorIds,
     deleteVectorsFromPinecone,
@@ -15,6 +16,7 @@ import {
 } from "../services/vector.service.js"
 
 const minimumIndexableCharacters = 20
+const maxContentEmbeddingBodyCharacters = 3600
 
 // Saves URL-based content by scraping metadata from the target page.
 // Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
@@ -77,6 +79,15 @@ export async function saveContentController(req, res) {
             tags: meta.tags,
             type: meta.type,
             url: resolvedUrl,
+            bodyText: meta.indexText,
+        })
+        const contentEmbeddingText = buildContentEmbeddingText({
+            title: resolvedTitle,
+            description: meta.description,
+            tags: meta.tags,
+            type: meta.type,
+            url: resolvedUrl,
+            bodyText: meta.transcriptText,
         })
 
         let chunks = []
@@ -90,7 +101,7 @@ export async function saveContentController(req, res) {
         // Only process if text is meaningful
         if (hasIndexableText(indexableText)) {
             // Store one embedding for the full item so the graph layer can compare saved content.
-            fullEmbedding = await embedText(indexableText)
+            fullEmbedding = await embedText(contentEmbeddingText)
 
             // ✂️ Split text into smaller chunks (better for search)
             chunks = await splitText(indexableText)
@@ -156,6 +167,7 @@ export async function saveContentController(req, res) {
             normalizedUrl: normalizedResolvedUrl,
             title: resolvedTitle,
             description: meta.description || "",
+            descriptionLanguage: meta.descriptionLanguage || "",
             summary: meta.description || "",
 
             image: meta.image || "",
@@ -275,6 +287,15 @@ export async function uploadContentController(req, res) {
         const previewImage = uploadType === "image"
             ? uploadedFile.url
             : uploadedFile.thumbnailUrl || ""
+        const resolvedUploadTags = resolveUploadTags(aiTags?.tags, uploadMetadata.tags)
+        const uploadEmbeddingText = buildContentEmbeddingText({
+            title: uploadMetadata.title,
+            description: uploadMetadata.description,
+            tags: resolvedUploadTags,
+            type: uploadType,
+            url: uploadedFile.url,
+            bodyText: text,
+        })
 
         let chunks = []
         let fullEmbedding = []
@@ -283,7 +304,7 @@ export async function uploadContentController(req, res) {
         // Only vectorize files with enough readable text to be useful for semantic search.
         if (hasIndexableText(text)) {
             // Store one document-level embedding alongside the chunk vectors for graph relationships.
-            fullEmbedding = await embedText(text)
+            fullEmbedding = await embedText(uploadEmbeddingText)
 
             // Split large text into smaller retrieval-friendly chunks.
             chunks = await splitText(text)
@@ -316,9 +337,10 @@ export async function uploadContentController(req, res) {
             userId,
             title: uploadMetadata.title,
             description: uploadMetadata.description,
+            descriptionLanguage: uploadMetadata.descriptionLanguage || "",
             summary: uploadMetadata.description,
             image: previewImage,
-            tags: resolveUploadTags(aiTags?.tags, uploadMetadata.tags),
+            tags: resolvedUploadTags,
             category: aiTags.category,
             subCategory: aiTags.subCategory,
             type: uploadType,
@@ -650,13 +672,30 @@ function hasIndexableText(text) {
 // Builds a compact retrieval text block for saved URLs so links can also be embedded and searched.
 // Input: normalized metadata for a saved URL.
 // Output: one chunkable text string for vector indexing.
-function buildSavedContentIndexText({ title, description, tags, type, url }) {
+function buildSavedContentIndexText({ title, description, tags, type, url, bodyText = "" }) {
     return normalizeExtractedText([
         title ? `Title: ${title}` : "",
         description ? `Description: ${description}` : "",
         Array.isArray(tags) && tags.length ? `Tags: ${tags.join(", ")}` : "",
         type ? `Type: ${type}` : "",
         url ? `Source URL: ${url}` : "",
+        bodyText ? `Body: ${bodyText}` : "",
+    ].filter(Boolean).join("\n"))
+}
+
+// Builds a bounded content-level embedding payload so large transcripts and PDFs stay graph-searchable without exceeding model limits.
+// Input: normalized content metadata plus optional long body text.
+// Output: compact text string safe for one content-level embedding request.
+function buildContentEmbeddingText({ title, description, tags, type, url, bodyText = "" }) {
+    const normalizedBodyText = normalizeExtractedText(bodyText).slice(0, maxContentEmbeddingBodyCharacters)
+
+    return normalizeExtractedText([
+        title ? `Title: ${title}` : "",
+        description ? `Description: ${description}` : "",
+        Array.isArray(tags) && tags.length ? `Tags: ${tags.join(", ")}` : "",
+        type ? `Type: ${type}` : "",
+        url ? `Source URL: ${url}` : "",
+        normalizedBodyText ? `Body: ${normalizedBodyText}` : "",
     ].filter(Boolean).join("\n"))
 }
 
@@ -755,6 +794,10 @@ function normalizeComparableUrl(url) {
 
     if (!trimmedUrl) {
         return ""
+    }
+
+    if (isYouTubeUrl(trimmedUrl)) {
+        return normalizeYouTubeUrl(trimmedUrl)
     }
 
     try {

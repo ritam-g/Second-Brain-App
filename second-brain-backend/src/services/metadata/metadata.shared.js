@@ -233,7 +233,7 @@ export function normalizeDescription(description) {
             .replace(/\s+/g, " ")
             .trim(),
     )
-        .replace(/^[^a-z0-9]+/i, "")
+        .replace(/^[^\p{L}\p{N}]+/u, "")
         .trim()
         .slice(0, maxMetadataDescriptionCharacters)
 

@@ -26,6 +26,7 @@ const contentSchema = new mongoose.Schema({
     },
 
     description: { type: String, default: "" },
+    descriptionLanguage: { type: String, default: "", trim: true },
     image: { type: String, default: "" },
 
     // Short AI-friendly summary used for cards and future retrieval flows.

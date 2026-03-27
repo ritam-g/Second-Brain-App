@@ -7,6 +7,8 @@ const maxGeneratedTags = 10
 const maxRagContextCharacters = 10000
 const maxRagChunkCharacters = 1200
 const maxInstagramDescriptionCharacters = 220
+const maxYouTubeDescriptionCharacters = 220
+const maxYouTubeTranscriptPromptCharacters = 4500
 const stopWords = new Set([
     "about",
     "after",
@@ -52,7 +54,7 @@ export async function generateUploadMetadataFromText(text, context = {}) {
         ],
         ["human", buildMetadataPromptText(text, context)],
     ])
-
+    
     const parsedMetadata = parseMetadataObject(normalizeModelContent(response?.content))
 
     return {
@@ -133,6 +135,43 @@ export async function generateInstagramDescriptionFallback({ url = "", title = "
     return normalizeGeneratedText(
         normalizeModelContent(response?.content),
         maxInstagramDescriptionCharacters,
+    )
+}
+
+// Generates a short English YouTube description from transcript or metadata.
+// Input: YouTube URL plus the best-known title, channel name, and optional transcript text.
+// Output: concise English description string safe to show on cards and use as a semantic summary.
+export async function generateYouTubeEnglishDescription({
+    url = "",
+    title = "",
+    channelName = "",
+    transcriptText = "",
+}) {
+    const model = getMistralModel()
+    const normalizedTranscript = String(transcriptText || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxYouTubeTranscriptPromptCharacters)
+    const response = await model.invoke([
+        [
+            "system",
+            "Create a short, neutral English description for a YouTube video saved into a private knowledge system. Use the transcript when available, otherwise use only the title, channel name, and URL clues provided. Do not invent unseen details or claims about the video. The output must be English only, one sentence, and under 220 characters.",
+        ],
+        [
+            "human",
+            [
+                `YouTube URL: ${String(url || "").trim() || "unknown"}`,
+                `Title: ${String(title || "").trim() || "unknown"}`,
+                `Channel: ${String(channelName || "").trim() || "unknown"}`,
+                `Transcript excerpt: ${normalizedTranscript || "Transcript unavailable"}`,
+                "Write one sentence only in English.",
+            ].join("\n"),
+        ],
+    ])
+
+    return normalizeGeneratedText(
+        normalizeModelContent(response?.content),
+        maxYouTubeDescriptionCharacters,
     )
 }
 

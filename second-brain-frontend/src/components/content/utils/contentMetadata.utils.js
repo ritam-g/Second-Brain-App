@@ -1,11 +1,11 @@
 import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import { getPreviewImage, getPreviewType } from './contentPreview.utils';
+import relativeTime from 'dayjs/plugin/relativeTime.js';
+import { getPreviewImage, getPreviewType } from './contentPreview.utils.js';
 
 dayjs.extend(relativeTime);
 
 const MAX_CARD_TITLE_CHARS = 58;
-const MAX_CARD_DESCRIPTION_CHARS = 132;
+const MAX_CARD_DESCRIPTION_CHARS = 180;
 const MAX_VISIBLE_TAGS = 3;
 const MAX_TAG_CHARS = 16;
 const MAX_CHECKLIST_ITEMS = 2;
@@ -114,6 +114,15 @@ export function getDisplayTitle(content) {
 export function getDisplayDescription(content) {
   const resolvedTitle = resolveTitleText(content);
   return truncateText(resolveDescriptionText(content, resolvedTitle), MAX_CARD_DESCRIPTION_CHARS);
+}
+
+// Returns the small description label shown above the card description body.
+// Input: content item.
+// Output: stable label string such as `Description EN`.
+export function getDescriptionLabel(content) {
+  return String(content?.descriptionLanguage || '').trim().toLowerCase() === 'en'
+    ? 'Description EN'
+    : 'Description';
 }
 
 // Produces filtered searchable tags for chip display.
@@ -287,22 +296,22 @@ function resolveDescriptionText(content, resolvedTitle) {
   }
 
   if (kind === 'document') {
-    return 'Document saved to your archive with a dedicated file preview.';
+    return 'No description available';
   }
 
   if (kind === 'video') {
-    return 'Video reference saved with a visual thumbnail for quick recall.';
+    return 'No description available';
   }
 
   if (kind === 'social') {
-    return 'Social content captured with a visual fallback so it stays scannable in the gallery.';
+    return 'No description available';
   }
 
   if (kind === 'image') {
-    return 'Visual reference saved to your archive for later inspiration.';
+    return 'No description available';
   }
 
-  return 'Web content saved to your archive with a visual preview-first layout.';
+  return 'No description available';
 }
 
 function normalizeTitleCandidate(value, previewType = '') {
@@ -461,7 +470,7 @@ function looksLikeContactLine(value) {
 function stripLeadingNoise(value) {
   const normalizedValue = normalizeText(value)
     .replace(/^(?:#[a-z0-9][a-z0-9-]*\s*){3,}/gi, '')
-    .replace(/^[^a-z0-9]+/i, '')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
     .trim();
 
   return normalizedValue;

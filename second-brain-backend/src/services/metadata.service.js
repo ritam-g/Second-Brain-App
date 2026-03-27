@@ -13,8 +13,8 @@ import {
 import {
     buildYouTubeThumbnail,
     extractYouTubeId,
-    getYouTubeMetadata,
-} from "./metadata/youtube-metadata.service.js"
+} from "../utils/youtube.util.js"
+import { getYouTubeContentMetadata } from "./youtube.service.js"
 
 // Fetches and normalizes metadata for any supported saved URL.
 // Input: original source URL string from the save form.
@@ -22,11 +22,11 @@ import {
 export async function getMetadata(url) {
     const platform = detectPlatform(url)
 
-    try {
-        if (platform === "youtube") {
-            return await getYouTubeMetadata(url)
-        }
+    if (platform === "youtube") {
+        return getYouTubeContentMetadata(url)
+    }
 
+    try {
         const { error, result } = await ogs({ url })
 
         if (error || !result) {

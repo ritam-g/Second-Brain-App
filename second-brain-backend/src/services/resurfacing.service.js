@@ -163,7 +163,7 @@ async function findResurfacingCandidates({ userId, dateWindow }) {
             $lt: dateWindow.end,
         },
     })
-        .select("title url tags category subCategory type description image summary createdAt vectorReady contentId +embedding")
+        .select("title url tags category subCategory type description descriptionLanguage image summary createdAt vectorReady contentId +embedding")
         .sort({ createdAt: -1 })
         .limit(maxCandidateCount)
         .lean()
