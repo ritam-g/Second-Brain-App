@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "install:backend": "npm install --prefix second-brain-backend",
-    "install:frontend": "npm install --prefix second-brain-frontend",
+    "install:frontend": "npm install --include=dev --prefix second-brain-frontend",
     "build:frontend": "npm run build --prefix second-brain-frontend",
     "build": "npm run install:backend && npm run install:frontend && npm run build:frontend",
     "start": "node second-brain-backend/server.js"
