@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCcw, SearchX, Share2 } from 'lucide-react';
+import { RefreshCcw, Search, SearchX, Share2, X } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import GraphCanvas from '../features/graph/components/GraphCanvas';
 import NodeDetailsPanel from '../features/graph/components/NodeDetailsPanel';
 import MainLayout from '../components/layout/MainLayout';
 import Button from '../components/ui/Button';
 import GlassCard from '../components/ui/GlassCard';
+import Input from '../components/ui/Input';
 import { useGetContent } from '../hooks/useContent';
 import { useLogout } from '../hooks/useAuth';
 import { getGraphData } from '../redux/graphSlice';
@@ -28,6 +29,9 @@ const GraphPage = () => {
   const { performLogout, loading: logoutLoading } = useLogout();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const normalizedSearchQuery = normalizeSearchQuery(deferredSearchQuery);
 
   useEffect(() => {
     dispatch(getGraphData());
@@ -62,13 +66,17 @@ const GraphPage = () => {
     () => normalizeGraphPayload({ nodes, edges }),
     [edges, nodes],
   );
+  const graphNodes = useMemo(
+    () => normalizedGraph.nodes.map((node) => enrichGraphNode(node, contentById.get(node.id))),
+    [contentById, normalizedGraph.nodes],
+  );
 
   // Keep category filters local to the page so the graph canvas only receives visible nodes and edges.
   const visibleNodes = useMemo(
-    () => normalizedGraph.nodes.filter((node) => (
+    () => graphNodes.filter((node) => (
       selectedCategory === 'All' || resolveGraphCategory(node) === selectedCategory
     )),
-    [normalizedGraph.nodes, selectedCategory],
+    [graphNodes, selectedCategory],
   );
 
   const visibleNodeIds = useMemo(
@@ -82,6 +90,16 @@ const GraphPage = () => {
     )),
     [normalizedGraph.edges, visibleNodeIds],
   );
+  const searchMatches = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return [];
+    }
+
+    return graphNodes.filter((node) => (
+      String(node?.title || '').toLowerCase().includes(normalizedSearchQuery)
+    ));
+  }, [graphNodes, normalizedSearchQuery]);
+  const highlightedNodeId = normalizedSearchQuery ? String(searchMatches[0]?.id || '') : '';
 
   // When filters change, move the details panel to the best remaining node instead of leaving stale selection behind.
   useEffect(() => {
@@ -96,6 +114,20 @@ const GraphPage = () => {
       setSelectedNodeId(resolvePreferredNodeId(visibleNodes, visibleEdges));
     }
   }, [selectedNodeId, visibleEdges, visibleNodes]);
+
+  useEffect(() => {
+    if (highlightedNodeId && !visibleNodeIds.has(highlightedNodeId)) {
+      setSelectedCategory('All');
+    }
+  }, [highlightedNodeId, visibleNodeIds]);
+
+  useEffect(() => {
+    if (!highlightedNodeId || highlightedNodeId === selectedNodeId) {
+      return;
+    }
+
+    setSelectedNodeId(highlightedNodeId);
+  }, [highlightedNodeId, selectedNodeId]);
 
   const selectedNode = useMemo(
     () => visibleNodes.find((node) => node.id === selectedNodeId) || null,
@@ -114,6 +146,11 @@ const GraphPage = () => {
   const hasInitialLoadingState = loading && !normalizedGraph.nodes.length;
   const hasNoGraph = !loading && !error && !normalizedGraph.nodes.length;
   const hasNoMatches = !loading && !error && normalizedGraph.nodes.length > 0 && !visibleNodes.length;
+  const searchSummary = normalizedSearchQuery
+    ? searchMatches.length
+      ? `Focused on ${searchMatches[0].title}`
+      : `No nodes found for "${searchQuery.trim()}"`
+    : `${visibleNodes.length} nodes ready to explore`;
 
   return (
     <MainLayout
@@ -127,10 +164,10 @@ const GraphPage = () => {
       onPrimaryAction={() => dispatch(getGraphData())}
       onLogout={performLogout}
       logoutLoading={logoutLoading}
-      rightMetaLabel={`${visibleNodes.length} nodes | ${visibleEdges.length} links | semantic relationship view`}
+      showFloatingAction={false}
     >
       <section
-        className="graph-page debug-graph-page flex flex-col gap-6"
+        className="graph-page debug-graph-page flex flex-col gap-6 xl:min-h-[calc(100vh-9.5rem)]"
         data-debug="graph-page"
         data-category={selectedCategory}
         data-node-count={visibleNodes.length}
@@ -163,7 +200,24 @@ const GraphPage = () => {
             </p>
           </div>
 
-          <div className="graph-actions debug-graph-actions flex flex-wrap gap-3" data-debug="graph-actions">
+          <div className="graph-actions debug-graph-actions flex w-full flex-col gap-3 sm:flex-row xl:w-auto xl:min-w-[30rem] xl:items-center xl:justify-end" data-debug="graph-actions">
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search and focus a node by title..."
+              icon={Search}
+              className="w-full xl:max-w-[24rem]"
+              rightSlot={searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-obsidian-500 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-obsidian-300"
+                  aria-label="Clear graph search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            />
             <Button
               type="button"
               variant="surface"
@@ -179,7 +233,7 @@ const GraphPage = () => {
         </MotionDiv>
 
         <div
-          className="graph-category-rail debug-graph-category-rail obsidian-scroll flex gap-2 overflow-x-auto pb-1"
+          className="graph-category-rail debug-graph-category-rail obsidian-scroll flex flex-wrap items-center gap-2 overflow-x-auto pb-1"
           data-debug="graph-category-rail"
         >
           {graphCategories.map((category) => (
@@ -199,6 +253,10 @@ const GraphPage = () => {
               {category}
             </button>
           ))}
+
+          <div className="ml-auto hidden rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-obsidian-500 lg:inline-flex">
+            {searchSummary}
+          </div>
         </div>
 
         {error ? (
@@ -234,17 +292,18 @@ const GraphPage = () => {
           />
         ) : (
           <div
-            className="graph-workspace debug-graph-workspace grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)]"
+            className="graph-workspace debug-graph-workspace grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)] xl:items-start"
             data-debug="graph-workspace"
           >
             <GlassCard
-              className="graph-canvas-shell debug-graph-canvas-shell relative min-h-[40rem] overflow-hidden p-2"
+              className="graph-canvas-shell debug-graph-canvas-shell relative h-[min(66vh,40rem)] min-h-[24rem] overflow-hidden p-2 sm:p-3 xl:h-[min(66vh,40rem)]"
               data-debug="graph-canvas-shell"
             >
               <GraphCanvas
                 nodes={visibleNodes}
                 edges={visibleEdges}
                 selectedNodeId={selectedNodeId}
+                highlightedNodeId={highlightedNodeId}
                 onNodeSelect={(node) => {
                   setSelectedNodeId(String(node?.id || ''));
                 }}
@@ -256,7 +315,7 @@ const GraphPage = () => {
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: 'easeOut' }}
-              className="graph-details-shell debug-graph-details-shell"
+              className="graph-details-shell debug-graph-details-shell xl:h-[min(66vh,40rem)] xl:overflow-hidden"
               data-debug="graph-details-shell"
             >
               <NodeDetailsPanel
@@ -395,6 +454,19 @@ function normalizeGraphNode(node) {
   };
 }
 
+function enrichGraphNode(node, content) {
+  if (!node) {
+    return null;
+  }
+
+  return {
+    ...node,
+    title: String(content?.title || node.title || 'Untitled Content').trim() || 'Untitled Content',
+    image: String(content?.image || node.image || '').trim(),
+    type: String(content?.type || node.type || 'document').trim() || 'document',
+  };
+}
+
 function resolveGraphCategory(node) {
   const normalizedType = String(node?.type || '').toLowerCase();
 
@@ -491,6 +563,12 @@ function getLinkEndpointId(endpoint) {
   }
 
   return String(endpoint || '').trim();
+}
+
+function normalizeSearchQuery(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 export default GraphPage;

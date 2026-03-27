@@ -21,6 +21,8 @@ const MainLayout = ({
   logoutLoading,
   searchPlaceholder,
   rightMetaLabel,
+  stableDesktopInset = false,
+  showFloatingAction = true,
   children,
 }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -46,6 +48,21 @@ const MainLayout = ({
     };
   }, []);
 
+  const handleToggleCompact = () => {
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    setIsSidebarCompact((previous) => !previous);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+
+  const desktopInsetClass = stableDesktopInset || !isSidebarCompact
+    ? 'lg:pl-[17.5rem]'
+    : 'lg:pl-24';
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-obsidian-900 text-obsidian-300">
       <div className="pointer-events-none fixed inset-0 bg-obsidian-glow opacity-90" />
@@ -60,7 +77,7 @@ const MainLayout = ({
         <Sidebar
           user={user}
           isCompact={isSidebarCompact}
-          onToggleCompact={() => setIsSidebarCompact((previous) => !previous)}
+          onToggleCompact={handleToggleCompact}
           onPrimaryAction={onPrimaryAction}
         />
       </div>
@@ -95,7 +112,7 @@ const MainLayout = ({
         ) : null}
       </AnimatePresence>
 
-      <div className={clsx('relative min-h-screen transition-[padding] duration-300', isSidebarCompact ? 'lg:pl-24' : 'lg:pl-[17.5rem]')}>
+      <div className={clsx('relative min-h-screen overflow-x-clip transition-[padding-left] duration-300', desktopInsetClass)}>
         <Topbar
           user={user}
           searchValue={searchValue}
@@ -105,10 +122,11 @@ const MainLayout = ({
           selectedCategory={selectedCategory}
           onCategoryChange={onCategoryChange}
           onOpenSidebar={() => setIsMobileSidebarOpen(true)}
-          onToggleCompact={() => setIsSidebarCompact((previous) => !previous)}
+          onToggleCompact={handleToggleCompact}
           onLogout={onLogout}
           logoutLoading={logoutLoading}
           isSidebarCompact={isSidebarCompact}
+          stableDesktopInset={stableDesktopInset}
           searchPlaceholder={searchPlaceholder}
           rightMetaLabel={rightMetaLabel}
         />
@@ -123,16 +141,18 @@ const MainLayout = ({
         </MotionMain>
       </div>
 
-      <MotionButton
-        type="button"
-        whileHover={{ y: -2, scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={onPrimaryAction}
-        className="fixed bottom-6 right-6 z-30 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-obsidian-950 shadow-[0_24px_45px_rgba(248,174,29,0.24)]"
-        aria-label="Capture thought"
-      >
-        <Sparkles className="h-5 w-5" />
-      </MotionButton>
+      {showFloatingAction ? (
+        <MotionButton
+          type="button"
+          whileHover={{ y: -2, scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={onPrimaryAction}
+          className="fixed bottom-6 right-6 z-30 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-obsidian-950 shadow-[0_24px_45px_rgba(248,174,29,0.24)]"
+          aria-label="Capture thought"
+        >
+          <Sparkles className="h-5 w-5" />
+        </MotionButton>
+      ) : null}
     </div>
   );
 };

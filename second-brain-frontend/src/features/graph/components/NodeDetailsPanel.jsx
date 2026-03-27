@@ -61,7 +61,7 @@ const NodeDetailsPanel = ({
       data-node-type={content?.type || node?.type || 'unknown'}
     >
       <div className="flex h-full flex-col">
-        <div className="node-details-media debug-node-details-media relative overflow-hidden border-b border-[rgba(255,204,102,0.08)]" data-debug="node-details-media">
+        <div className="node-details-media debug-node-details-media relative shrink-0 overflow-hidden border-b border-[rgba(255,204,102,0.08)]" data-debug="node-details-media">
           {resolvedImage && !imageFailed ? (
             <img
               src={resolvedImage}
@@ -87,7 +87,7 @@ const NodeDetailsPanel = ({
           </div>
         </div>
 
-        <div className="node-details-body debug-node-details-body flex flex-1 flex-col gap-6 px-6 py-6" data-debug="node-details-body">
+        <div className="node-details-body debug-node-details-body obsidian-scroll flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6" data-debug="node-details-body">
           <div className="node-details-stats debug-node-details-stats grid gap-3 sm:grid-cols-2" data-debug="node-details-stats">
             <StatCard label="Content Type" value={resolvedType} />
             <StatCard label="Connected Nodes" value={String(relationCount)} />

@@ -20,6 +20,7 @@ const Topbar = ({
   onLogout,
   logoutLoading,
   isSidebarCompact = false,
+  stableDesktopInset = false,
   searchPlaceholder = 'Search the archive...',
   rightMetaLabel,
 }) => {
@@ -27,7 +28,7 @@ const Topbar = ({
   const hasCategories = Array.isArray(categories) && categories.length > 0;
 
   return (
-    <header className={clsx('fixed right-0 top-0 z-30 left-0', isSidebarCompact ? 'lg:left-24' : 'lg:left-[17.5rem]')}>
+    <header className={clsx('fixed left-0 right-0 top-0 z-30', stableDesktopInset || !isSidebarCompact ? 'lg:left-[17.5rem]' : 'lg:left-24')}>
       <div className="border-b border-[rgba(255,204,102,0.06)] bg-[rgba(17,13,11,0.72)] backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="flex items-center gap-3">
