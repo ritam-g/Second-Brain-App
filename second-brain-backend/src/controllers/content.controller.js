@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import contentModel from "../models/content.model.js"
 import { generateStructuredTags } from "../services/aiTagging.service.js"
 import { splitText } from "../services/chunk.service.js"
+import { cleanupContentArtifacts, clearUserContentByUserId } from "../services/content-cleanup.service.js"
 import { embedText, generateEmbeddings } from "../services/embedding.service.js"
 import { detectUploadFileType, extractFileContent } from "../services/extract.service.js"
 import { getMetadata } from "../services/metadata.service.js"
@@ -10,7 +11,6 @@ import { resolveUploadMetadata } from "../services/upload-metadata.service.js"
 import { deleteFileFromImageKit, uploadFileToImageKit } from "../services/upload.service.js"
 import { isYouTubeUrl, normalizeYouTubeUrl } from "../utils/youtube.util.js"
 import {
-    buildVectorIds,
     deleteVectorsFromPinecone,
     storeVectorsInPinecone,
 } from "../services/vector.service.js"
@@ -354,6 +354,7 @@ export async function uploadContentController(req, res) {
             vectorReady,
             contentId,
             vectorIds,
+            fileStorageId: uploadedFileId,
         })
 
         return res.status(201).json({
@@ -419,20 +420,7 @@ export async function DeleteContentController(req, res, next) {
             return res.status(404).json({ message: "Content not found or not authorized" })
         }
 
-        const storedVectorIds = deletedContent.vectorIds?.length
-            ? deletedContent.vectorIds
-            : deletedContent.contentId
-                ? buildVectorIds(deletedContent.contentId, deletedContent.textChunks?.length)
-                : []
-
-        // Delete the matching vectors as part of content cleanup.
-        if (storedVectorIds.length) {
-            try {
-                await deleteVectorsFromPinecone(storedVectorIds)
-            } catch (cleanupError) {
-                console.error("Delete Vector Cleanup Error:", cleanupError.message)
-            }
-        }
+        await cleanupContentArtifacts(deletedContent)
 
         return res.status(200).json({
             success: true,
@@ -441,6 +429,31 @@ export async function DeleteContentController(req, res, next) {
         })
     } catch (error) {
         console.error("Delete Content Error:", error.message)
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+        })
+    }
+}
+
+// Deletes every saved item for the authenticated user and clears related vectors/uploaded files.
+// Input: Express request with authenticated `req.user.id`.
+// Output: JSON response containing the deleted item count.
+export async function clearAllContentController(req, res, next) {
+    try {
+        const result = await clearUserContentByUserId(String(req.user.id))
+
+        return res.status(200).json({
+            success: true,
+            message: result.deletedCount
+                ? `Cleared ${result.deletedCount} saved item${result.deletedCount === 1 ? "" : "s"} from your archive`
+                : "Your archive was already empty",
+            data: {
+                deletedCount: result.deletedCount,
+            },
+        })
+    } catch (error) {
+        console.error("Clear All Content Error:", error.message)
         return res.status(500).json({
             success: false,
             error: error.message,

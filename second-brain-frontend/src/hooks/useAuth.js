@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess, logout, setAuthLoading } from '../redux/slices/authSlice';
-import { loginUserApi, registerUserApi, checkAuthApi, logoutApi } from '../api/auth.api';
+import { clearContentState } from '../redux/slices/contentSlice';
+import { resetGraphState } from '../redux/graphSlice';
+import {
+  changePasswordApi,
+  checkAuthApi,
+  deleteAccountApi,
+  loginUserApi,
+  logoutApi,
+  registerUserApi,
+  updateProfileApi,
+} from '../api/auth.api';
 import { getApiErrorMessage } from '../utils/api-error';
 import { notify } from '../utils/toast';
 
@@ -118,7 +128,7 @@ export const useLogout = () => {
         },
         { toastId: 'logout-request' },
       );
-      dispatch(logout());
+      resetSessionState(dispatch);
       return { success: true };
     } catch (err) {
       return { success: false, error: getApiErrorMessage(err, 'Logout failed') };
@@ -129,3 +139,97 @@ export const useLogout = () => {
 
   return { performLogout, loading };
 };
+
+export const useUpdateProfile = () => {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+
+  const updateProfile = async (profileData) => {
+    setLoading(true);
+    try {
+      const response = await notify.promise(
+        updateProfileApi(profileData),
+        {
+          pending: 'Updating your profile...',
+          success: (result) => result?.message || 'Profile updated successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to update profile'),
+        },
+        { toastId: 'update-profile-request' },
+      );
+
+      if (response?.data?.user) {
+        dispatch(loginSuccess(response.data.user));
+      }
+
+      return { success: true, data: response?.data?.user || null };
+    } catch (err) {
+      return { success: false, error: getApiErrorMessage(err, 'Failed to update profile') };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateProfile, loading };
+};
+
+export const useChangePassword = () => {
+  const [loading, setLoading] = useState(false);
+
+  const changePassword = async (passwordData) => {
+    setLoading(true);
+    try {
+      await notify.promise(
+        changePasswordApi(passwordData),
+        {
+          pending: 'Updating your password...',
+          success: (result) => result?.message || 'Password updated successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to update password'),
+        },
+        { toastId: 'change-password-request' },
+      );
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getApiErrorMessage(err, 'Failed to update password') };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { changePassword, loading };
+};
+
+export const useDeleteAccount = () => {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+
+  const deleteAccount = async () => {
+    setLoading(true);
+    try {
+      await notify.promise(
+        deleteAccountApi(),
+        {
+          pending: 'Deleting your account...',
+          success: (result) => result?.message || 'Account deleted successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to delete account'),
+        },
+        { toastId: 'delete-account-request' },
+      );
+
+      resetSessionState(dispatch);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getApiErrorMessage(err, 'Failed to delete account') };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { deleteAccount, loading };
+};
+
+function resetSessionState(dispatch) {
+  dispatch(logout());
+  dispatch(clearContentState());
+  dispatch(resetGraphState());
+}

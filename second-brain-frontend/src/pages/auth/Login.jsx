@@ -5,6 +5,7 @@ import { useLogin } from '../../hooks/useAuth';
 import Button from '../../components/ui/Button';
 import InputField from '../../components/ui/InputField';
 import { notify } from '../../utils/toast';
+import { getPreferredLandingRoute } from '../../utils/userPreferences';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ const Login = () => {
 
     const result = await loginUser({ email: email.trim(), password });
     if (result.success) {
-      navigate('/dashboard');
+      navigate(getPreferredLandingRoute());
     }
   };
 

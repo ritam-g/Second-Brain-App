@@ -48,6 +48,7 @@ const contentSlice = createSlice({
         state.isViewerOpen = false;
       }
     },
+    clearContentState: () => ({ ...initialState }),
   },
 });
 
@@ -59,6 +60,7 @@ export const {
   closeContentViewer,
   addContentItem,
   removeContentItem,
+  clearContentState,
 } = contentSlice.actions;
 export default contentSlice.reducer;
 

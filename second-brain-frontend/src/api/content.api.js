@@ -15,6 +15,11 @@ export const deleteContentApi = async (id) => {
   return response.data;
 };
 
+export const clearAllContentApi = async () => {
+  const response = await apiClient.delete('/content/clear-all');
+  return response.data;
+};
+
 export const uploadContentApi = async (formData) => {
   const response = await apiClient.post('/content/upload', formData, {
     headers: {

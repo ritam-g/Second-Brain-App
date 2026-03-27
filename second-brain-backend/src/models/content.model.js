@@ -46,6 +46,9 @@ const contentSchema = new mongoose.Schema({
 
     // Stores one content-level embedding for relationship graph building.
     embedding: { type: [Number], default: [], select: false },
+
+    // Tracks uploaded asset ids so later delete/account-clear flows can remove ImageKit files safely.
+    fileStorageId: { type: String, default: "", trim: true },
 }, {
     timestamps: true,
 })

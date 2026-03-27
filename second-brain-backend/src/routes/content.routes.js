@@ -1,5 +1,6 @@
 import { Router } from "express"
 import {
+    clearAllContentController,
     DeleteContentController,
     getContentAllController,
     getSingleUserContentController,
@@ -162,6 +163,8 @@ contentRouter.get("/get-all", AuthMiddleware, getContentAllController)
  *         description: Content not found
  */
 contentRouter.delete("/delete/:id", AuthMiddleware, DeleteContentController)
+
+contentRouter.delete("/clear-all", AuthMiddleware, clearAllContentController)
 
 /**   
  * @swagger

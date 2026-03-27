@@ -265,21 +265,41 @@ const GraphCanvas = ({
 
     const simulation = d3
       .forceSimulation(simulationNodes)
+
+      // ✅ smarter links (based on similarity weight)
       .force(
         'link',
         d3
           .forceLink(simulationLinks)
-          .id((node) => node.id)
-          .distance((link) => resolveLinkDistance(link.weight))
-          .strength((link) => 0.22 + (clamp(Number(link.weight) || 0, 0, 1) * 0.18)),
+          .id((d) => d.id)
+          .distance((link) => 180 - (link.weight * 80)) // 🔥 dynamic distance
+          .strength(0.7)
       )
-      .force('charge', d3.forceManyBody().strength(resolveChargeStrength(simulationNodes.length)))
+
+      // ✅ strong repulsion → spreads nodes
+      .force(
+        'charge',
+        d3.forceManyBody().strength(resolveChargeStrength(simulationNodes.length))
+      )
+
+      // ✅ soft centering (not forcing too hard)
       .force('center', d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
-      .force('x', d3.forceX(dimensions.width / 2).strength(0.04))
-      .force('y', d3.forceY(dimensions.height / 2).strength(0.04))
-      .force('collision', d3.forceCollide().radius((node) => Math.max(52, (node.labelWidth / 2) + 18)))
-      .alpha(0.92)
-      .alphaDecay(0.045);
+
+      // ✅ smooth gravity instead of tight pulling
+      .force('x', d3.forceX(dimensions.width / 2).strength(0.05))
+      .force('y', d3.forceY(dimensions.height / 2).strength(0.05))
+
+      // ✅ BIG collision radius (important)
+      .force(
+        'collision',
+        d3.forceCollide().radius(NODE_RADIUS + 30).strength(0.9)
+      )
+
+      // ❌ REMOVE HARD BOUND (very important)
+      // .force('bound', ...) ← DELETE THIS
+
+      .alpha(1)
+      .alphaDecay(0.03);
 
     const renderSceneFrame = () => {
       constrainSimulationNodes(simulationNodes, dimensions);

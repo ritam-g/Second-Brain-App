@@ -1,5 +1,13 @@
 import { Router } from 'express'
-import { registerController, userLoginController, checkAuthController, logoutController } from '../controllers/auth.controller.js'
+import {
+  changePasswordController,
+  checkAuthController,
+  deleteAccountController,
+  logoutController,
+  registerController,
+  updateProfileController,
+  userLoginController,
+} from '../controllers/auth.controller.js'
 import { AuthMiddleware } from '../middleware/auth_middleware.js'
 
 /**   
@@ -87,6 +95,12 @@ authRouter.post('/login', userLoginController)
  *         description: Unauthorized
  */
 authRouter.get('/me', AuthMiddleware, checkAuthController)
+
+authRouter.patch('/profile', AuthMiddleware, updateProfileController)
+
+authRouter.patch('/password', AuthMiddleware, changePasswordController)
+
+authRouter.delete('/account', AuthMiddleware, deleteAccountController)
 
 /**  
  * @swagger

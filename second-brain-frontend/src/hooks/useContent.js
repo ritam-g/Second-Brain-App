@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
-import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem } from '../redux/slices/contentSlice';
-import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi, semanticSearchContentApi } from '../api/content.api';
+import { setContentLoading, setContentError, setContentData, addContentItem, removeContentItem, clearContentState } from '../redux/slices/contentSlice';
+import { getContentApi, saveContentApi, deleteContentApi, uploadContentApi, semanticSearchContentApi, clearAllContentApi } from '../api/content.api';
 import { getApiErrorMessage } from '../utils/api-error';
 import { notify } from '../utils/toast';
 
@@ -134,6 +134,38 @@ export const useUploadContent = () => {
   };
 
   return { upload, loading };
+};
+
+export const useClearAllContent = () => {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+
+  const clearAllContent = async () => {
+    setLoading(true);
+    dispatch(setContentLoading(true));
+    try {
+      const response = await notify.promise(
+        clearAllContentApi(),
+        {
+          pending: 'Clearing your archive...',
+          success: (result) => result?.message || 'Archive cleared successfully.',
+          error: (error) => getApiErrorMessage(error, 'Failed to clear content'),
+        },
+        { toastId: 'clear-all-content-request' },
+      );
+
+      dispatch(clearContentState());
+      return { success: true, data: response?.data || null };
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Failed to clear content');
+      dispatch(setContentError(message));
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { clearAllContent, loading };
 };
 
 export const useSemanticSearchContent = () => {

@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken"
 import userModel from "../models/user.model.js"
+import { serializeUser } from "../utils/user-response.util.js"
 
 export async function AuthMiddleware(req, res, next) {
     try {
@@ -20,11 +21,7 @@ export async function AuthMiddleware(req, res, next) {
                 message: "Unauthorized - User not found" 
             })
         }
-        req.user = {
-            id: user._id,
-            username: user.username,
-            email: user.email
-        }
+        req.user = serializeUser(user)
         next()
     } catch (error) {
         console.error("Auth Middleware Error:", error.message);

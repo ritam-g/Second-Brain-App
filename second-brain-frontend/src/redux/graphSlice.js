@@ -21,7 +21,14 @@ const graphSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    resetGraphState: (state) => {
+      state.nodes = [];
+      state.edges = [];
+      state.loading = false;
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(getGraphData.pending, (state) => {
@@ -41,4 +48,5 @@ const graphSlice = createSlice({
   },
 });
 
+export const { resetGraphState } = graphSlice.actions;
 export default graphSlice.reducer;

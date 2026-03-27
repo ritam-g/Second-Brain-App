@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { getPreferredLandingRoute } from '../utils/userPreferences';
 
 export const ProtectedRoute = ({ children }) => {
   const { user, loading } = useSelector((state) => state.auth);
@@ -32,7 +33,7 @@ export const PublicRoute = ({ children }) => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getPreferredLandingRoute()} replace />;
   }
 
   return children;
