@@ -6,7 +6,7 @@ const defaultWelcomeMessages = [
   {
     id: 'assistant-welcome',
     role: 'assistant',
-    text: 'Ask me about anything inside your uploaded PDFs, OCR images, or saved links. I will retrieve the strongest chunks from Pinecone and answer using that grounded context.',
+    text: 'Ask anything about your saved PDFs, OCR captures, links, or research. I will retrieve the most relevant context from your archive and answer from that grounded evidence.',
     sources: [],
     timestamp: formatTimestamp(new Date()),
   },

@@ -66,9 +66,10 @@ const UploadPanel = ({
           <Input
             value={title}
             onChange={(event) => onTitleChange(event.target.value)}
-            placeholder="Optional custom title"
+            placeholder="Title Is needed for Ai "
             icon={isPdf ? FileText : FileImage}
             className="flex-1"
+            required
           />
           <Button type="submit" variant="surface" loading={loading} className="rounded-2xl px-5 py-3">
             Upload File

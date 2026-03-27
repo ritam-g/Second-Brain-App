@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { notify } from '../utils/toast';
 import MainLayout from '../components/layout/MainLayout';
-import ChatBox from '../features/chat/components/ChatBox';
+import ChatContainer from '../components/chat/ChatContainer';
 import { useLogout } from '../hooks/useAuth';
 import { useChat } from '../features/chat/hooks/useChat';
 
@@ -49,10 +49,10 @@ const DeepFocus = () => {
       onPrimaryAction={() => composerRef.current?.focus()}
       onLogout={performLogout}
       logoutLoading={logoutLoading}
-      searchPlaceholder="Ask your knowledge base a real question..."
+      searchPlaceholder="Ask anything about your knowledge..."
       rightMetaLabel="Pinecone retrieval + Mistral answer"
     >
-      <ChatBox
+      <ChatContainer
         messages={messages}
         draft={draft}
         onDraftChange={setDraft}
