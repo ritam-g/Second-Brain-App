@@ -32,11 +32,14 @@ import {
 } from './utils';
 import { useDeleteContent } from '../../hooks/useContent';
 
-// Preview-first content card used in the dashboard masonry grid.
-// Input: saved content item and its masonry index.
-// Output: rich visual card with a fixed preview area for every content type.
+/**
+ * ContentCard Component
+ * Responsibility: renders one saved content item in the shared dashboard card format.
+ * Handles: preview fallbacks, metadata presentation, and delete/open actions.
+ */
 const ContentCard = ({ content, index }) => {
   const { deleteContent, loading } = useDeleteContent();
+  const deleteId = content?.deleteId || content?.contentId || content?._id;
   const variant = getCardVariant(content, index);
   const kind = getContentKind(content);
   const previewType = getPreviewType(content);
@@ -63,11 +66,16 @@ const ContentCard = ({ content, index }) => {
   const handleDelete = async (event) => {
     event.preventDefault();
 
+    if (!deleteId) {
+      return;
+    }
+
     if (window.confirm('Delete this archive entry?')) {
-      await deleteContent(content._id);
+      await deleteContent(deleteId);
     }
   };
 
+  // Fall back to generated artwork so broken external previews do not collapse card layout.
   const handlePreviewError = () => {
     if (previewSource !== fallbackPreviewSource) {
       setPreviewSource(fallbackPreviewSource);
@@ -79,14 +87,23 @@ const ContentCard = ({ content, index }) => {
   };
 
   return (
-    <GlassCard interactive className="group relative overflow-hidden">
+    <GlassCard
+      interactive
+      className="content-card debug-content-card group relative overflow-hidden"
+      data-debug="content-card"
+      data-id={content?._id || ''}
+      data-type={content?.type || previewType || 'unknown'}
+      data-variant={variant}
+      data-preview-type={previewType}
+    >
       {previewType !== 'youtube' && destinationUrl && destinationUrl !== '#' ? (
         <a
           href={destinationUrl}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Open ${displayTitle}`}
-          className="absolute inset-0 z-10 rounded-[28px]"
+          className="content-card-link debug-content-card-link absolute inset-0 z-10 rounded-[28px]"
+          data-debug="content-card-link"
         />
       ) : null}
 
@@ -105,28 +122,30 @@ const ContentCard = ({ content, index }) => {
         onError={handlePreviewError}
       />
 
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-[11px] uppercase tracking-[0.18em] text-obsidian-500">{sourceLabel}</p>
+      <div className="content-card-body debug-content-card-body p-5" data-debug="content-card-body">
+        <div className="content-card-meta debug-content-card-meta flex items-center justify-between gap-3" data-debug="content-card-meta">
+          <p className="content-card-source debug-content-card-source min-w-0 truncate text-[11px] uppercase tracking-[0.18em] text-obsidian-500">{sourceLabel}</p>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-[rgba(255,204,102,0.12)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-soft">
+            <span className="content-card-type debug-content-card-type inline-flex items-center rounded-full border border-[rgba(255,204,102,0.12)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-soft">
               {typeBadge}
             </span>
-            <span className="max-w-[42%] truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-obsidian-500">
+            <span className="content-card-label debug-content-card-label max-w-[42%] truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-obsidian-500">
               {variant === 'collection' ? 'Visual Set' : cardLabel}
             </span>
           </div>
         </div>
 
         <h3
-          className="mt-3 text-[1.45rem] font-bold leading-tight text-[#fff1d5]"
+          className="content-title debug-content-title mt-3 text-[1.45rem] font-bold leading-tight text-[#fff1d5]"
+          data-debug="content-title"
           style={getLineClampStyle(2)}
         >
           {displayTitle}
         </h3>
 
         <p
-          className="mt-3 text-sm leading-7 text-obsidian-400"
+          className="content-description debug-content-description mt-3 text-sm leading-7 text-obsidian-400"
+          data-debug="content-description"
           style={getLineClampStyle(kind === 'document' ? 3 : 4)}
         >
           {displayDescription}
@@ -137,14 +156,14 @@ const ContentCard = ({ content, index }) => {
         ) : null}
 
         {displayTags.length ? (
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="content-tags debug-content-tags mt-5 flex flex-wrap gap-2" data-debug="content-tags">
             {displayTags.map((tag) => (
               <TagChip key={tag} label={tag} tone="muted" className="max-w-[132px] truncate" />
             ))}
           </div>
         ) : null}
 
-        <div className="mt-6 flex items-center justify-between border-t border-[rgba(255,204,102,0.08)] pt-4 text-xs text-obsidian-500">
+        <div className="content-footer debug-content-footer mt-6 flex items-center justify-between border-t border-[rgba(255,204,102,0.08)] pt-4 text-xs text-obsidian-500" data-debug="content-footer">
           <span className="inline-flex items-center gap-2">
             <Clock3 className="h-3.5 w-3.5" />
             Saved {relativeTime}
@@ -156,6 +175,10 @@ const ContentCard = ({ content, index }) => {
   );
 };
 
+/**
+ * CardPreview Component
+ * Responsibility: keeps preview rendering consistent across image, video, and document content types.
+ */
 function CardPreview({
   previewType,
   previewSource,
@@ -182,7 +205,11 @@ function CardPreview({
 
   if (youtubeEmbedUrl) {
     return (
-      <div className="relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]">
+      <div
+        className="content-card-preview content-card-preview-video debug-content-card-preview relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]"
+        data-debug="content-card-preview"
+        data-preview-type={previewType}
+      >
         <iframe
           src={youtubeEmbedUrl}
           title={title}
@@ -212,7 +239,11 @@ function CardPreview({
   const previewAlt = previewType === 'pdf' ? `${title} PDF preview` : title;
 
   return (
-    <div className="relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]">
+    <div
+      className="content-card-preview debug-content-card-preview relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.03)]"
+      data-debug="content-card-preview"
+      data-preview-type={previewType}
+    >
       {!loaded ? (
         <div className="absolute inset-0 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.03),rgba(255,255,255,0.08),rgba(255,255,255,0.03))]" />
       ) : null}
@@ -260,9 +291,17 @@ function CardPreview({
   );
 }
 
+/**
+ * PdfPreview Component
+ * Responsibility: preserves a branded preview surface when a PDF only has generated artwork.
+ */
 function PdfPreview({ title, label, sourceLabel }) {
   return (
-    <div className="relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[linear-gradient(135deg,#43240d,#110d0c_42%,#6a3c12_100%)]">
+    <div
+      className="content-card-preview content-card-preview-pdf debug-content-card-preview relative h-[220px] overflow-hidden border-b border-[rgba(255,204,102,0.08)] bg-[linear-gradient(135deg,#43240d,#110d0c_42%,#6a3c12_100%)]"
+      data-debug="content-card-preview"
+      data-preview-type="pdf"
+    >
       <div className="absolute -right-12 top-10 h-40 w-40 rounded-full bg-[rgba(248,174,29,0.2)] blur-3xl" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,231,191,0.12),_transparent_36%)]" />
       <PreviewBadge label={label} />
@@ -286,19 +325,30 @@ function PdfPreview({ title, label, sourceLabel }) {
   );
 }
 
+/**
+ * PreviewBadge Component
+ * Responsibility: exposes a small, stable preview label for quick visual inspection.
+ */
 function PreviewBadge({ label }) {
   return (
-    <div className="absolute left-5 top-5 inline-flex max-w-[150px] items-center truncate rounded-full border border-[rgba(255,241,214,0.12)] bg-[rgba(12,9,8,0.6)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent backdrop-blur-xl">
+    <div
+      className="content-card-badge debug-content-card-badge absolute left-5 top-5 inline-flex max-w-[150px] items-center truncate rounded-full border border-[rgba(255,241,214,0.12)] bg-[rgba(12,9,8,0.6)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent backdrop-blur-xl"
+      data-debug="content-card-badge"
+    >
       {label}
     </div>
   );
 }
 
+/**
+ * DocumentChecklist Component
+ * Responsibility: shows shortened document takeaways without expanding the full saved description.
+ */
 function DocumentChecklist({ items }) {
   return (
-    <ul className="mt-5 space-y-3">
+    <ul className="content-card-checklist debug-content-card-checklist mt-5 space-y-3" data-debug="content-card-checklist">
       {items.map((item) => (
-        <li key={item} className="flex items-start gap-3 text-sm leading-6 text-obsidian-400">
+        <li key={item} className="content-card-checklist-item debug-content-card-checklist-item flex items-start gap-3 text-sm leading-6 text-obsidian-400">
           <SquareCheck className="mt-1 h-4 w-4 shrink-0 text-accent" />
           <span style={getLineClampStyle(2)}>{item}</span>
         </li>

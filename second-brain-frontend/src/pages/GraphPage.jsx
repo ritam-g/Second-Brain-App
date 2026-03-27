@@ -13,9 +13,11 @@ import { getGraphData } from '../redux/graphSlice';
 
 const graphCategories = ['All', 'Links', 'Documents', 'Images', 'Video', 'Social'];
 
-// Dedicated route-level workspace for the semantic relationship graph.
-// Input: graph API data plus optional enriched content metadata from the user's library.
-// Output: stable graph canvas that only reacts to route navigation and explicit node/category interaction.
+/**
+ * GraphPage Component
+ * Responsibility: hosts the semantic relationship workspace for the saved archive.
+ * Handles: graph normalization, category filtering, and node detail selection.
+ */
 const GraphPage = () => {
   const dispatch = useDispatch();
   const MotionDiv = motion.div;
@@ -36,6 +38,7 @@ const GraphPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
+  // Index content by both API ids so graph nodes can resolve richer card metadata when available.
   const contentById = useMemo(() => {
     const entries = new Map();
 
@@ -60,6 +63,7 @@ const GraphPage = () => {
     [edges, nodes],
   );
 
+  // Keep category filters local to the page so the graph canvas only receives visible nodes and edges.
   const visibleNodes = useMemo(
     () => normalizedGraph.nodes.filter((node) => (
       selectedCategory === 'All' || resolveGraphCategory(node) === selectedCategory
@@ -79,6 +83,7 @@ const GraphPage = () => {
     [normalizedGraph.edges, visibleNodeIds],
   );
 
+  // When filters change, move the details panel to the best remaining node instead of leaving stale selection behind.
   useEffect(() => {
     if (!visibleNodes.length) {
       setSelectedNodeId('');
@@ -124,14 +129,21 @@ const GraphPage = () => {
       logoutLoading={logoutLoading}
       rightMetaLabel={`${visibleNodes.length} nodes | ${visibleEdges.length} links | semantic relationship view`}
     >
-      <section className="flex flex-col gap-6">
+      <section
+        className="graph-page debug-graph-page flex flex-col gap-6"
+        data-debug="graph-page"
+        data-category={selectedCategory}
+        data-node-count={visibleNodes.length}
+        data-edge-count={visibleEdges.length}
+      >
         <MotionDiv
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between"
+          className="graph-header debug-graph-header flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between"
+          data-debug="graph-header"
         >
-          <div>
+          <div className="graph-heading debug-graph-heading" data-debug="graph-heading">
             <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-accent-soft">
               <Share2 className="h-3.5 w-3.5 text-accent" />
               Knowledge Graph
@@ -151,13 +163,14 @@ const GraphPage = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="graph-actions debug-graph-actions flex flex-wrap gap-3" data-debug="graph-actions">
             <Button
               type="button"
               variant="surface"
-              className="rounded-2xl px-5 py-3"
+              className="graph-refresh-button debug-graph-refresh rounded-2xl px-5 py-3"
               leadingIcon={<RefreshCcw className="h-4 w-4" />}
               loading={loading && !!normalizedGraph.nodes.length}
+              data-debug="graph-refresh-button"
               onClick={() => dispatch(getGraphData())}
             >
               Refresh Graph
@@ -165,12 +178,18 @@ const GraphPage = () => {
           </div>
         </MotionDiv>
 
-        <div className="obsidian-scroll flex gap-2 overflow-x-auto pb-1">
+        <div
+          className="graph-category-rail debug-graph-category-rail obsidian-scroll flex gap-2 overflow-x-auto pb-1"
+          data-debug="graph-category-rail"
+        >
           {graphCategories.map((category) => (
             <button
               key={category}
               type="button"
               onClick={() => setSelectedCategory(category)}
+              data-debug="graph-category-chip"
+              data-active={selectedCategory === category ? 'true' : 'false'}
+              data-category={category}
               className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
                 selectedCategory === category
                   ? 'bg-[rgba(248,174,29,0.14)] text-accent'
@@ -183,13 +202,17 @@ const GraphPage = () => {
         </div>
 
         {error ? (
-          <GlassCard className="flex flex-col gap-4 px-5 py-4 text-sm text-obsidian-400 sm:flex-row sm:items-center sm:justify-between">
+          <GlassCard
+            className="graph-error-state debug-graph-error flex flex-col gap-4 px-5 py-4 text-sm text-obsidian-400 sm:flex-row sm:items-center sm:justify-between"
+            data-debug="graph-error-state"
+          >
             <p>{typeof error === 'string' ? error : 'The knowledge graph could not be loaded right now.'}</p>
             <Button
               type="button"
               variant="surface"
-              className="rounded-2xl px-5 py-3"
+              className="graph-error-retry debug-graph-error-retry rounded-2xl px-5 py-3"
               leadingIcon={<RefreshCcw className="h-4 w-4" />}
+              data-debug="graph-error-retry"
               onClick={() => dispatch(getGraphData())}
             >
               Retry
@@ -210,8 +233,14 @@ const GraphPage = () => {
             description="Switch the graph category to reveal a wider part of your archive."
           />
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)]">
-            <GlassCard className="relative min-h-[40rem] overflow-hidden p-2">
+          <div
+            className="graph-workspace debug-graph-workspace grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)]"
+            data-debug="graph-workspace"
+          >
+            <GlassCard
+              className="graph-canvas-shell debug-graph-canvas-shell relative min-h-[40rem] overflow-hidden p-2"
+              data-debug="graph-canvas-shell"
+            >
               <GraphCanvas
                 nodes={visibleNodes}
                 edges={visibleEdges}
@@ -227,6 +256,8 @@ const GraphPage = () => {
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: 'easeOut' }}
+              className="graph-details-shell debug-graph-details-shell"
+              data-debug="graph-details-shell"
             >
               <NodeDetailsPanel
                 node={selectedNode}
@@ -251,9 +282,16 @@ const GraphPage = () => {
   );
 };
 
+/**
+ * GraphLoadingState Component
+ * Responsibility: keeps the graph workspace shape visible while graph data initializes.
+ */
 function GraphLoadingState() {
   return (
-    <GlassCard className="overflow-hidden px-6 py-10">
+    <GlassCard
+      className="graph-loading-state debug-graph-loading overflow-hidden px-6 py-10"
+      data-debug="graph-loading-state"
+    >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.72fr)]">
         <div className="min-h-[36rem] rounded-[28px] border border-[rgba(255,204,102,0.08)] bg-[linear-gradient(180deg,rgba(23,18,15,0.92),rgba(14,11,9,0.96))] p-6">
           <div className="h-full animate-pulse rounded-[24px] bg-[radial-gradient(circle_at_top,_rgba(103,232,249,0.08),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(248,174,29,0.1),_transparent_28%),rgba(255,255,255,0.02)]" />
@@ -272,14 +310,21 @@ function GraphLoadingState() {
   );
 }
 
+/**
+ * GraphEmptyState Component
+ * Responsibility: explains why the graph workspace currently has nothing meaningful to display.
+ */
 function GraphEmptyState({ title, description }) {
   return (
-    <GlassCard className="mx-auto max-w-3xl px-6 py-12 text-center">
+    <GlassCard
+      className="graph-empty-state debug-graph-empty mx-auto max-w-3xl px-6 py-12 text-center"
+      data-debug="graph-empty-state"
+    >
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[rgba(248,174,29,0.12)] text-accent">
         <SearchX className="h-7 w-7" />
       </div>
-      <h2 className="mt-5 text-2xl font-bold text-[#fff1d5]">{title}</h2>
-      <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-obsidian-400">{description}</p>
+      <h2 className="graph-empty-title debug-graph-empty-title mt-5 text-2xl font-bold text-[#fff1d5]">{title}</h2>
+      <p className="graph-empty-description debug-graph-empty-description mx-auto mt-3 max-w-2xl text-sm leading-7 text-obsidian-400">{description}</p>
     </GlassCard>
   );
 }
@@ -299,6 +344,7 @@ function normalizeGraphPayload({ nodes, edges }) {
 
   const edgesById = new Map();
 
+  // Collapse mirrored or duplicate API edges into one strongest connection for rendering.
   (Array.isArray(edges) ? edges : []).forEach((edge) => {
     const sourceId = getLinkEndpointId(edge?.source);
     const targetId = getLinkEndpointId(edge?.target);

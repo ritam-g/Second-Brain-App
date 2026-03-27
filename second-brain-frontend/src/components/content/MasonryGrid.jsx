@@ -10,20 +10,33 @@ const breakpointColumns = {
   768: 1,
 };
 
-// Responsive masonry grid wrapper with built-in loading skeletons.
-// Input: data items, loading state, and a render callback for each card.
-// Output: masonry layout that preserves the premium staggered gallery feel across breakpoints.
-const MasonryGrid = ({ items = [], loading = false, renderItem }) => {
-  const skeletonItems = Array.from({ length: 6 }, (_, index) => index);
+/**
+ * MasonryGrid Component
+ * Responsibility: keeps variable-height cards aligned in one reusable layout shell.
+ * Handles: animated card entry and skeleton placeholders for loading states.
+ */
+const MasonryGrid = ({ items = [], loading = false, renderItem, skeletonCount = 6 }) => {
+  const skeletonItems = Array.from({ length: skeletonCount }, (_, index) => index);
   const MotionDiv = motion.div;
 
   return (
-    <Masonry breakpointCols={breakpointColumns} className="obsidian-masonry-grid" columnClassName="obsidian-masonry-grid_column">
+    <Masonry
+      breakpointCols={breakpointColumns}
+      className="obsidian-masonry-grid debug-masonry-grid"
+      columnClassName="obsidian-masonry-grid_column debug-masonry-column"
+      data-debug="masonry-grid"
+      data-loading={loading ? 'true' : 'false'}
+      data-item-count={items.length}
+    >
       {loading
         ? skeletonItems.map((index) => <ContentCardSkeleton key={index} index={index} />)
         : items.map((item, index) => (
           <MotionDiv
-            key={item._id}
+            key={item?._id || item?.contentId || item?.id || `masonry-item-${index}`}
+            className="masonry-item debug-masonry-item"
+            data-debug="masonry-item"
+            data-id={item?._id || item?.contentId || item?.id || ''}
+            data-type={item?.type || 'unknown'}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.04, duration: 0.3 }}
@@ -35,11 +48,18 @@ const MasonryGrid = ({ items = [], loading = false, renderItem }) => {
   );
 };
 
+/**
+ * ContentCardSkeleton Component
+ * Responsibility: preserves expected card rhythm while real content is still loading.
+ */
 function ContentCardSkeleton({ index }) {
   const heightPresets = ['h-[280px]', 'h-[360px]', 'h-[320px]'];
 
   return (
-    <GlassCard className="overflow-hidden">
+    <GlassCard
+      className="content-card-skeleton debug-content-card-skeleton overflow-hidden"
+      data-debug="content-card-skeleton"
+    >
       <div className={`animate-pulse bg-[rgba(255,255,255,0.02)] ${heightPresets[index % heightPresets.length]}`}>
         <div className="h-40 bg-[rgba(255,255,255,0.04)]" />
         <div className="space-y-3 p-5">

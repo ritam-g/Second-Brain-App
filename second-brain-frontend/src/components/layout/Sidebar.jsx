@@ -20,7 +20,7 @@ import Button from '../ui/Button';
 const navigationItems = [
   { label: 'Knowledge Graph', icon: Share2, path: '/graph' },
   { label: 'Library', icon: BookOpenText, path: '/dashboard' },
-  { label: 'Deep Focus', icon: BrainCircuit, path: '/deep-focus' },
+  { label: 'Deep Focus Ai Chat', icon: BrainCircuit, path: '/deep-focus' },
   { label: 'Recent Discoveries', icon: Compass },
   { label: 'Archived Thoughts', icon: FolderArchive },
   { label: 'Settings', icon: Settings },

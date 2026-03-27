@@ -15,9 +15,11 @@ const typePalette = {
   github: '#A3A3A3',      // neutral gray (clean)
 };
 
-// Controlled D3 canvas for the knowledge graph route.
-// Input: normalized nodes/edges plus explicit selection callback.
-// Output: zoomable, draggable semantic graph with local hover tooltip state.
+/**
+ * GraphCanvas Component
+ * Responsibility: renders the interactive D3 scene for graph exploration.
+ * Handles: force layout, zoom/drag behavior, and hover/selection feedback.
+ */
 const GraphCanvas = ({
   nodes = [],
   edges = [],
@@ -32,6 +34,7 @@ const GraphCanvas = ({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [hoveredNode, setHoveredNode] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  // D3 works best with a pre-normalized scene model instead of raw API payloads.
   const graphData = useMemo(() => buildGraphData(nodes, edges), [nodes, edges]);
 
   onNodeSelectRef.current = onNodeSelect;
@@ -84,25 +87,32 @@ const GraphCanvas = ({
     const simulationNodes = graphData.nodes.map((node) => ({ ...node }));
     const simulationLinks = graphData.links.map((link) => ({ ...link }));
     const root = svg.append('g');
-    const linksLayer = root.append('g').attr('class', 'graph-links');
-    const nodesLayer = root.append('g').attr('class', 'graph-nodes');
+    const linksLayer = root.append('g').attr('class', 'graph-links debug-graph-links').attr('data-debug', 'graph-links');
+    const nodesLayer = root.append('g').attr('class', 'graph-nodes debug-graph-nodes').attr('data-debug', 'graph-nodes');
 
     const linkSelection = linksLayer
       .selectAll('line')
       .data(simulationLinks, (link) => link.id)
       .join('line')
+      .attr('class', 'graph-link debug-graph-link')
+      .attr('data-debug', 'graph-link')
+      .attr('data-source-id', (link) => getLinkEndpointId(link.source))
+      .attr('data-target-id', (link) => getLinkEndpointId(link.target))
       .attr('stroke-linecap', 'round');
 
     const nodeSelection = nodesLayer
       .selectAll('g')
       .data(simulationNodes, (node) => node.id)
       .join('g')
-      .attr('class', 'graph-node')
+      .attr('class', 'graph-node debug-graph-node')
+      .attr('data-debug', 'graph-node')
+      .attr('data-node-id', (node) => node.id)
+      .attr('data-node-type', (node) => node.type)
       .style('cursor', 'pointer');
 
-    nodeSelection.append('circle').attr('class', 'graph-node-halo');
-    nodeSelection.append('circle').attr('class', 'graph-node-ring').attr('fill', 'transparent');
-    nodeSelection.append('circle').attr('class', 'graph-node-core');
+    nodeSelection.append('circle').attr('class', 'graph-node-halo debug-graph-node-halo');
+    nodeSelection.append('circle').attr('class', 'graph-node-ring debug-graph-node-ring').attr('fill', 'transparent');
+    nodeSelection.append('circle').attr('class', 'graph-node-core debug-graph-node-core');
 
     const zoomBehavior = d3
       .zoom()
@@ -223,15 +233,24 @@ const GraphCanvas = ({
   }, [hoveredNode, selectedNodeId]);
 
   return (
-    <div ref={containerRef} className="relative h-full min-h-[28rem] w-full overflow-hidden rounded-[28px]">
+    <div
+      ref={containerRef}
+      className="graph-canvas debug-graph-canvas relative h-full min-h-[28rem] w-full overflow-hidden rounded-[28px]"
+      data-debug="graph-canvas"
+      data-node-count={graphData.nodes.length}
+      data-link-count={graphData.links.length}
+      data-selected-node={selectedNodeId || ''}
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(103,232,249,0.09),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(248,174,29,0.08),_transparent_22%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(circle,rgba(103,232,249,0.22)_1px,transparent_1px)] [background-position:0_0] [background-size:2.6rem_2.6rem]" />
 
-      <div className="absolute left-5 top-5 z-10 flex flex-wrap gap-2">
+      <div className="graph-legend debug-graph-legend absolute left-5 top-5 z-10 flex flex-wrap gap-2" data-debug="graph-legend">
         {resolveLegendItems(graphData.nodes).map((item) => (
           <div
             key={item.type}
-            className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(14,11,9,0.7)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-obsidian-400 backdrop-blur-xl"
+            className="graph-legend-item debug-graph-legend-item inline-flex items-center gap-2 rounded-full border border-[rgba(255,204,102,0.08)] bg-[rgba(14,11,9,0.7)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-obsidian-400 backdrop-blur-xl"
+            data-debug="graph-legend-item"
+            data-type={item.type}
           >
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
             {item.label}
@@ -239,11 +258,20 @@ const GraphCanvas = ({
         ))}
       </div>
 
-      <svg ref={svgRef} className="relative z-[1] block h-full w-full" role="img" aria-label="Knowledge graph canvas" />
+      <svg
+        ref={svgRef}
+        className="graph-canvas-surface debug-graph-canvas-surface relative z-[1] block h-full w-full"
+        role="img"
+        aria-label="Knowledge graph canvas"
+        data-debug="graph-canvas-surface"
+      />
 
       {hoveredNode ? (
         <div
-          className="pointer-events-none absolute z-20 max-w-[14rem] rounded-2xl border border-[rgba(255,191,64,0.18)] bg-[rgba(14,11,9,0.92)] px-4 py-3 shadow-[0_16px_35px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          className="graph-tooltip debug-graph-tooltip pointer-events-none absolute z-20 max-w-[14rem] rounded-2xl border border-[rgba(255,191,64,0.18)] bg-[rgba(14,11,9,0.92)] px-4 py-3 shadow-[0_16px_35px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          data-debug="graph-tooltip"
+          data-node-id={hoveredNode.id}
+          data-node-type={hoveredNode.type}
           style={{
             left: `${clamp(tooltipPosition.x + 16, 16, Math.max(16, dimensions.width - 248))}px`,
             top: `${clamp(tooltipPosition.y + 16, 16, Math.max(16, dimensions.height - 108))}px`,
@@ -255,7 +283,10 @@ const GraphCanvas = ({
       ) : null}
 
       {!graphData.links.length && graphData.nodes.length ? (
-        <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-2xl border border-[rgba(255,204,102,0.08)] bg-[rgba(14,11,9,0.72)] px-4 py-3 text-xs leading-6 text-obsidian-400 backdrop-blur-xl">
+        <div
+          className="graph-empty-links-hint debug-graph-empty-links-hint pointer-events-none absolute bottom-5 left-5 z-10 rounded-2xl border border-[rgba(255,204,102,0.08)] bg-[rgba(14,11,9,0.72)] px-4 py-3 text-xs leading-6 text-obsidian-400 backdrop-blur-xl"
+          data-debug="graph-empty-links-hint"
+        >
           Semantic links will appear here once more saved content crosses the similarity threshold.
         </div>
       ) : null}
@@ -278,6 +309,7 @@ function buildGraphData(nodes, edges) {
 
   const linksById = new Map();
 
+  // Merge reverse-direction duplicates so D3 receives one link per relationship.
   (Array.isArray(edges) ? edges : []).forEach((edge) => {
     const sourceId = getLinkEndpointId(edge?.source);
     const targetId = getLinkEndpointId(edge?.target);

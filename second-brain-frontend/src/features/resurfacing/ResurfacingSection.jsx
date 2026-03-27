@@ -1,51 +1,56 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import ResurfacedCard from './ResurfacedCard';
+import React, { useMemo } from 'react';
+import { useSelector } from 'react-redux';
+import MasonryGrid from '../../components/content/MasonryGrid';
+import ContentCard from '../../components/content/ContentCard';
+import { normalizeContentCollection } from '../../components/content/utils';
 import { useResurfacing } from './useResurfacing';
 
-// Lightweight resurfacing strip that keeps the time context inside each card instead of a large separate UI.
-// Input: none. Internally loads the primary resurfacing window for the authenticated user.
-// Output: compact card grid or nothing when there is no resurfaced content.
+/**
+ * ResurfacingSection Component
+ * Responsibility: injects time-based memory resurfacing into the dashboard without changing card UI.
+ * Handles: resurfacing fetch state and card normalization for archived content.
+ */
 export default function ResurfacingSection() {
+  const { items } = useSelector((state) => state.content);
   const testingDebugEnabled = resolveResurfacingDebugMode();
   const { data, loading, error } = useResurfacing(2, { debug: testingDebugEnabled });
-  const MotionDiv = motion.div;
+  const availableContentIds = useMemo(
+    () => new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => String(item?._id || item?.id || '').trim())
+        .filter(Boolean),
+    ),
+    [items],
+  );
+  // Only keep resurfaced cards that still exist in the current archive snapshot.
+  const resurfacedItems = useMemo(
+    () => normalizeContentCollection(data.slice(0, 3), { context: 'resurfacing' }).filter((item) => {
+      if (!item?.deleteId || !availableContentIds.size) {
+        return true;
+      }
 
-  if (error || (!loading && !data.length)) {
+      return availableContentIds.has(String(item.deleteId).trim());
+    }),
+    [availableContentIds, data],
+  );
+
+  if (error || (!loading && !resurfacedItems.length)) {
     return null;
   }
 
   return (
-    <section className="mt-8">
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {loading && !data.length
-          ? Array.from({ length: 3 }, (_, index) => <ResurfacedCardSkeleton key={index} />)
-          : data.slice(0, 3).map((item, index) => (
-            <MotionDiv
-              key={item._id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.24, delay: index * 0.05 }}
-            >
-              <ResurfacedCard item={item} />
-            </MotionDiv>
-          ))}
-      </div>
+    <section
+      className="resurfacing-section debug-resurfacing-section mt-8"
+      data-debug="resurfacing-section"
+      data-count={resurfacedItems.length}
+    >
+      <MasonryGrid
+        items={resurfacedItems}
+        loading={loading && !resurfacedItems.length}
+        skeletonCount={3}
+        renderItem={(item, index) => <ContentCard content={item} index={index} />}
+      />
     </section>
-  );
-}
-
-function ResurfacedCardSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-[24px] border border-[rgba(255,204,102,0.08)] bg-[rgba(23,18,15,0.88)]">
-      <div className="h-44 animate-pulse bg-[rgba(255,255,255,0.04)]" />
-      <div className="space-y-3 p-4">
-        <div className="h-7 w-1/2 rounded-full bg-[rgba(255,255,255,0.05)]" />
-        <div className="h-3 w-1/3 rounded-full bg-[rgba(255,255,255,0.05)]" />
-        <div className="h-6 w-3/4 rounded-full bg-[rgba(255,255,255,0.06)]" />
-        <div className="h-4 w-full rounded-full bg-[rgba(255,255,255,0.04)]" />
-      </div>
-    </div>
   );
 }
 

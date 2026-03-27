@@ -3,9 +3,11 @@ import { ExternalLink, Link2, Share2, Sparkles } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 import Button from '../ui/Button';
 
-// Detail panel for the currently selected graph node.
-// Input: selected node data, related nodes, and open/select callbacks.
-// Output: stable sidebar panel that reacts only to explicit selection changes.
+/**
+ * NodeDetailsPanel Component
+ * Responsibility: turns the selected graph node into a readable inspection panel.
+ * Handles: node metadata, related links, and open-content actions.
+ */
 const NodeDetailsPanel = ({
   node,
   content,
@@ -23,7 +25,10 @@ const NodeDetailsPanel = ({
 
   if (!node) {
     return (
-      <GlassCard className="h-full px-6 py-8">
+      <GlassCard
+        className="node-details-panel debug-node-details-panel h-full px-6 py-8"
+        data-debug="node-details-panel-empty"
+      >
         <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[rgba(248,174,29,0.12)] text-accent">
             <Share2 className="h-6 w-6" />
@@ -49,18 +54,24 @@ const NodeDetailsPanel = ({
     : 'No links yet';
 
   return (
-    <GlassCard className="h-full overflow-hidden">
+    <GlassCard
+      className="node-details-panel debug-node-details-panel h-full overflow-hidden"
+      data-debug="node-details-panel"
+      data-node-id={node?.id || ''}
+      data-node-type={content?.type || node?.type || 'unknown'}
+    >
       <div className="flex h-full flex-col">
-        <div className="relative overflow-hidden border-b border-[rgba(255,204,102,0.08)]">
+        <div className="node-details-media debug-node-details-media relative overflow-hidden border-b border-[rgba(255,204,102,0.08)]" data-debug="node-details-media">
           {resolvedImage && !imageFailed ? (
             <img
               src={resolvedImage}
               alt={resolvedTitle}
-              className="h-56 w-full object-cover"
+              className="node-details-image debug-node-details-image h-full w-full rounded-md object-cover"
+              data-debug="node-details-image"
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="h-56 w-full bg-[radial-gradient(circle_at_top_left,_rgba(103,232,249,0.22),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(248,174,29,0.2),_transparent_28%),linear-gradient(180deg,rgba(28,22,18,0.96),rgba(14,11,9,1))]" />
+            <div className="node-details-image-fallback debug-node-details-image-fallback h-56 w-full bg-[radial-gradient(circle_at_top_left,_rgba(103,232,249,0.22),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(248,174,29,0.2),_transparent_28%),linear-gradient(180deg,rgba(28,22,18,0.96),rgba(14,11,9,1))]" data-debug="node-details-image-fallback" />
           )}
 
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(10,8,7,0)_18%,rgba(10,8,7,0.86)_100%)]" />
@@ -71,13 +82,13 @@ const NodeDetailsPanel = ({
               Active Node
             </div>
 
-            <h2 className="mt-4 text-[2rem] font-extrabold leading-tight text-[#fff1d5]">{resolvedTitle}</h2>
-            <p className="mt-3 text-sm leading-7 text-obsidian-300">{resolvedDescription}</p>
+            <h2 className="node-details-title debug-node-details-title mt-4 text-[2rem] font-extrabold leading-tight text-[#fff1d5]">{resolvedTitle}</h2>
+            <p className="node-details-description debug-node-details-description mt-3 text-sm leading-7 text-obsidian-300">{resolvedDescription}</p>
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 px-6 py-6">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div className="node-details-body debug-node-details-body flex flex-1 flex-col gap-6 px-6 py-6" data-debug="node-details-body">
+          <div className="node-details-stats debug-node-details-stats grid gap-3 sm:grid-cols-2" data-debug="node-details-stats">
             <StatCard label="Content Type" value={resolvedType} />
             <StatCard label="Connected Nodes" value={String(relationCount)} />
             <StatCard label="Strongest Link" value={strongestPercent} />
@@ -85,7 +96,7 @@ const NodeDetailsPanel = ({
           </div>
 
           {resolvedTags.length ? (
-            <div>
+            <div className="node-details-tags debug-node-details-tags" data-debug="node-details-tags">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-obsidian-500">Semantic Tags</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {resolvedTags.map((tag) => (
@@ -100,7 +111,7 @@ const NodeDetailsPanel = ({
             </div>
           ) : null}
 
-          <div>
+          <div className="node-details-related debug-node-details-related" data-debug="node-details-related">
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-accent" />
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-obsidian-500">Related Nodes</p>
@@ -113,7 +124,10 @@ const NodeDetailsPanel = ({
                     <button
                       type="button"
                       onClick={() => onSelectRelatedNode?.(item.id)}
-                      className="flex w-full items-start justify-between gap-4 rounded-2xl border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-left transition-colors hover:border-[rgba(103,232,249,0.18)] hover:bg-[rgba(103,232,249,0.06)]"
+                      className="node-related-item debug-node-related-item flex w-full items-start justify-between gap-4 rounded-2xl border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-left transition-colors hover:border-[rgba(103,232,249,0.18)] hover:bg-[rgba(103,232,249,0.06)]"
+                      data-debug="node-related-item"
+                      data-related-node-id={item.id}
+                      data-related-node-type={item.type}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-[#fff1d5]">{item.title}</p>
@@ -135,8 +149,9 @@ const NodeDetailsPanel = ({
             <Button
               type="button"
               variant={canOpenContent ? 'amber' : 'surface'}
-              className="w-full rounded-2xl py-3 text-sm font-bold"
+              className="node-details-open-button debug-node-details-open-button w-full rounded-2xl py-3 text-sm font-bold"
               leadingIcon={<ExternalLink className="h-4 w-4" />}
+              data-debug="node-details-open-button"
               onClick={onOpenContent}
               disabled={!canOpenContent}
             >
@@ -149,9 +164,17 @@ const NodeDetailsPanel = ({
   );
 };
 
+/**
+ * StatCard Component
+ * Responsibility: presents one compact graph metric in a scan-friendly format.
+ */
 function StatCard({ label, value, subtle = false }) {
   return (
-    <div className="rounded-[24px] border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-4">
+    <div
+      className="node-stat-card debug-node-stat-card rounded-[24px] border border-[rgba(255,204,102,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-4"
+      data-debug="node-stat-card"
+      data-label={label}
+    >
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-obsidian-500">{label}</p>
       <p className={`mt-3 text-lg font-bold ${subtle ? 'text-obsidian-300' : 'text-accent-soft'}`}>{value}</p>
     </div>
