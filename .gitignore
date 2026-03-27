@@ -4,6 +4,7 @@
 .env.production
 .env.*.local
 .env.example
+.env.render
 # NOTE: .env.example is intentionally NOT ignored — safe to commit (no real secrets)
 
 # ── Dependencies ──────────────────────────────────────────────────────────────

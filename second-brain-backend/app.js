@@ -1,4 +1,6 @@
 import express from 'express'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import contentRouter from './src/routes/content.routes.js'
@@ -14,6 +16,9 @@ const isProduction = process.env.NODE_ENV === 'production'
 // In production: set CORS_ORIGIN to your Render static site URL (e.g. https://second-brain.onrender.com)
 // In development: falls back to the Vite dev server default.
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 
@@ -50,5 +55,22 @@ app.use((err, req, res, next) => {
     }
     next();
 });
+
+// ────────── FRONTEND SERVING ──────────
+// Serve static assets (CSS, JS, Images) from the built dist folder
+const frontendDistPath = path.join(__dirname, '../second-brain-frontend/dist')
+
+app.use(express.static(frontendDistPath))
+
+// Catch-all: Send index.html for any request that doesn't match an API route.
+// This allows React Router (SPA) to handle the routing internally.
+app.get('*any', (req, res) => {
+    // Only serve index.html for non-API routes
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(frontendDistPath, 'index.html'))
+    } else {
+        res.status(404).json({ success: false, message: 'API route not found' })
+    }
+})
 
 export default app

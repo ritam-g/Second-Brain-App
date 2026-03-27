@@ -1,27 +1,33 @@
 services:
-  # ─────────────────────────────────────────────────────
-  # 1. BACKEND — Render Web Service (Node.js)
-  # ─────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────────────
+  # SINGLE SERVICE DEPLOYMENT (Backend + Frontend together)
+  # The Backend server will serve the built Frontend "dist" folder.
+  # ────────────────────────────────────────────────────────────────────────────
   - type: web
-    name: second-brain-backend
+    name: second-brain-app
     runtime: node
     rootDir: second-brain-backend
-    buildCommand: npm install
+    
+    # 1. Install backend deps
+    # 2. Go to frontend, install deps, and build (creates dist folder)
+    # 3. Backend will serve that dist folder
+    buildCommand: npm install && cd ../second-brain-frontend && npm install && npm run build
+    
     startCommand: node server.js
+    
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      # ── Set these in Render Dashboard > Environment ──
+      
+      # ── REQUIRED SECRETS (Set these in Render Dashboard) ──
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
         sync: false
       - key: MISTRAL_API_KEY
         sync: false
-      - key: MISTRAL_EMBEDDING_MODEL
-        value: mistral-embed
       - key: PINECONE_API_KEY
         sync: false
       - key: PINECONE_INDEX_NAME
@@ -34,25 +40,8 @@ services:
         sync: false
       - key: IMAGEKIT_URL_ENDPOINT
         sync: false
-      # ── Replace with your actual Render static site URL after deploying frontend ──
-      - key: CORS_ORIGIN
-        sync: false
-
-  # ─────────────────────────────────────────────────────
-  # 2. FRONTEND — Render Static Site (Vite dist)
-  # ─────────────────────────────────────────────────────
-  - type: web
-    name: second-brain-frontend
-    runtime: static
-    rootDir: second-brain-frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    routes:
-      # SPA fallback: all routes serve index.html so React Router works
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      # ── Replace with your actual Render backend URL after deploying backend ──
+      
+      # For a single service, the backend URL is the frontend URL.
+      # VITE_API_URL should point to the /api of YOUR RENDER APP.
       - key: VITE_API_URL
         sync: false
