@@ -51,6 +51,7 @@ const Dashboard = () => {
   const [selectedTag, setSelectedTag] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isResultsHighlighted, setIsResultsHighlighted] = useState(false);
+  const [pendingCanvasFocusToken, setPendingCanvasFocusToken] = useState(0);
 
   const saveInputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -58,6 +59,7 @@ const Dashboard = () => {
   const pendingResultsFocusRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
   const highlightTimeoutRef = useRef(null);
+  const canvasFocusFrameRef = useRef(null);
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ const Dashboard = () => {
   useEffect(() => () => {
     window.clearTimeout(scrollTimeoutRef.current);
     window.clearTimeout(highlightTimeoutRef.current);
+    window.cancelAnimationFrame(canvasFocusFrameRef.current);
   }, []);
 
   const handleSave = async (event) => {
@@ -88,6 +91,7 @@ const Dashboard = () => {
 
     if (result.success) {
       setUrlInput('');
+      setPendingCanvasFocusToken(Date.now());
     }
   };
 
@@ -130,6 +134,7 @@ const Dashboard = () => {
     if (result.success) {
       setSelectedFile(null);
       setUploadTitle('');
+      setPendingCanvasFocusToken(Date.now());
 
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -318,6 +323,23 @@ const Dashboard = () => {
     selectedTag,
     semanticLoading,
   ]);
+
+  useEffect(() => {
+    if (!pendingCanvasFocusToken) {
+      return;
+    }
+
+    // Run after the save/upload render commit so the canvas section is ready in the DOM.
+    window.cancelAnimationFrame(canvasFocusFrameRef.current);
+    canvasFocusFrameRef.current = window.requestAnimationFrame(() => {
+      scrollToResults();
+      setPendingCanvasFocusToken(0);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(canvasFocusFrameRef.current);
+    };
+  }, [pendingCanvasFocusToken, scrollToResults]);
 
   return (
     <MainLayout
