@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Second Brain</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="popup">
+    <h1 class="popup__title">Second Brain</h1>
+    <p class="popup__subtitle">Save the current page to your library.</p>
+
+    <button id="saveButton" class="popup__button" type="button">Save Page</button>
+
+    <p id="status" class="popup__status" data-state="idle" aria-live="polite">
+      Ready to save this page.
+    </p>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@ import userModel from "../models/user.model.js"
 
 export async function AuthMiddleware(req, res, next) {
     try {
-        const { jwtToken } = req.cookies
+        const jwtToken = resolveJwtToken(req)
         if (!jwtToken) {
             return res.status(401).json({ 
                 success: false,
@@ -34,4 +34,20 @@ export async function AuthMiddleware(req, res, next) {
             error: error.message 
         })
     }
+}
+
+function resolveJwtToken(req) {
+    const cookieToken = String(req.cookies?.jwtToken || "").trim()
+
+    if (cookieToken) {
+        return cookieToken
+    }
+
+    const authorizationHeader = String(req.headers?.authorization || "").trim()
+
+    if (!authorizationHeader.toLowerCase().startsWith("bearer ")) {
+        return ""
+    }
+
+    return authorizationHeader.slice(7).trim()
 }

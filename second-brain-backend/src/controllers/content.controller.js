@@ -26,7 +26,7 @@ export async function saveContentController(req, res) {
     let vectorIds = []
 
     try {
-        const { url, title } = req.body
+        const { url, title, description = "", image = "" } = req.body
 
         // ❌ Validation: URL is required
         if (!url) {
@@ -71,11 +71,13 @@ export async function saveContentController(req, res) {
 
         // 🏷️ STEP 3: Resolve final title
         const resolvedTitle = title || meta.title || "No title"
+        const resolvedDescription = meta.description || String(description || "").trim()
+        const resolvedImage = meta.image || String(image || "").trim()
 
         // 🧠 STEP 4: Build searchable text (used for embeddings + AI)
         const indexableText = buildSavedContentIndexText({
             title: resolvedTitle,
-            description: meta.description,
+            description: resolvedDescription,
             tags: meta.tags,
             type: meta.type,
             url: resolvedUrl,
@@ -83,7 +85,7 @@ export async function saveContentController(req, res) {
         })
         const contentEmbeddingText = buildContentEmbeddingText({
             title: resolvedTitle,
-            description: meta.description,
+            description: resolvedDescription,
             tags: meta.tags,
             type: meta.type,
             url: resolvedUrl,
@@ -121,7 +123,7 @@ export async function saveContentController(req, res) {
                         contentId,              // 🔗 Link to MongoDB
                         type: meta.type || "article",
                         url: resolvedUrl,
-                        image: meta.image || "",
+                        image: resolvedImage,
                     },
                 })
 
@@ -166,11 +168,11 @@ export async function saveContentController(req, res) {
             url: resolvedUrl,
             normalizedUrl: normalizedResolvedUrl,
             title: resolvedTitle,
-            description: meta.description || "",
+            description: resolvedDescription,
             descriptionLanguage: meta.descriptionLanguage || "",
-            summary: meta.description || "",
+            summary: resolvedDescription,
 
-            image: meta.image || "",
+            image: resolvedImage,
             type: meta.type || "article",
 
             // 🔥 AI-powered structure
