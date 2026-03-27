@@ -1,19 +1,16 @@
 services:
   # ────────────────────────────────────────────────────────────────────────────
-  # SINGLE SERVICE DEPLOYMENT (Backend + Frontend together)
+  # MODERN SINGLE-SERVICE DEPLOYMENT
   # The Backend server will serve the built Frontend "dist" folder.
   # ────────────────────────────────────────────────────────────────────────────
   - type: web
     name: second-brain-app
     runtime: node
-    rootDir: second-brain-backend
     
-    # 1. Install backend deps
-    # 2. Go to frontend, install deps, and build (creates dist folder)
-    # 3. Backend will serve that dist folder
-    buildCommand: npm install && cd ../second-brain-frontend && npm install && npm run build
-    
-    startCommand: node server.js
+    # ROOT IS NOW THE ACTUAL REPO ROOT (no more rootDir: second-brain-backend)
+    # This solves all path issues with sibling folders.
+    buildCommand: npm run build
+    startCommand: npm run start
     
     envVars:
       - key: NODE_ENV
@@ -41,7 +38,9 @@ services:
       - key: IMAGEKIT_URL_ENDPOINT
         sync: false
       
-      # For a single service, the backend URL is the frontend URL.
-      # VITE_API_URL should point to the /api of YOUR RENDER APP.
+      # Since it's one domain, point both to your Render URL.
+      # e.g. https://your-app.onrender.com/api
       - key: VITE_API_URL
+        sync: false
+      - key: CORS_ORIGIN
         sync: false
