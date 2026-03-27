@@ -3,6 +3,7 @@ const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:5173';
 const RENDER_API_BASE_URL = 'https://second-brain-app.onrender.com/api';
 const AUTH_COOKIE_NAME = 'jwtToken';
 const SAVE_ENDPOINT = '/content/save';
+const UPLOAD_ENDPOINT = '/content/upload';
 const AUTH_CHECK_ENDPOINT = '/auth/me';
 const LOGIN_ROUTE = '/login';
 const DASHBOARD_ROUTE = '/dashboard';
@@ -11,8 +12,29 @@ const STORAGE_KEYS = {
   authToken: 'authToken',
 };
 
-const saveButton = document.getElementById('saveButton');
+const sessionActionButton = document.getElementById('sessionActionButton');
+const sessionTitle = document.getElementById('sessionTitle');
+const sessionDescription = document.getElementById('sessionDescription');
+const sessionBadge = document.getElementById('sessionBadge');
+const saveCurrentPageButton = document.getElementById('saveCurrentPageButton');
+const activePageTitle = document.getElementById('activePageTitle');
+const activePageUrl = document.getElementById('activePageUrl');
+const linkForm = document.getElementById('linkForm');
+const linkInput = document.getElementById('linkInput');
+const saveLinkButton = document.getElementById('saveLinkButton');
+const uploadForm = document.getElementById('uploadForm');
+const fileInput = document.getElementById('fileInput');
+const fileTitleInput = document.getElementById('fileTitleInput');
+const uploadFileButton = document.getElementById('uploadFileButton');
+const fileName = document.getElementById('fileName');
+const fileMeta = document.getElementById('fileMeta');
 const statusText = document.getElementById('status');
+
+const buttonLabels = {
+  saveCurrentPageButton: 'Save Current Page',
+  saveLinkButton: 'Save Pasted Link',
+  uploadFileButton: 'Upload File',
+};
 
 let popupSessionState = {
   ready: false,
@@ -20,69 +42,240 @@ let popupSessionState = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
 };
 
+let popupViewState = {
+  activeTab: null,
+};
+
+let activeActionButton = null;
+
 const initializationPromise = initializePopup();
 
-saveButton.addEventListener('click', handleSaveClick);
+sessionActionButton.addEventListener('click', handleSessionActionClick);
+saveCurrentPageButton.addEventListener('click', handleSaveCurrentPageClick);
+linkForm.addEventListener('submit', handleSaveLinkSubmit);
+uploadForm.addEventListener('submit', handleUploadSubmit);
+fileInput.addEventListener('change', handleFileInputChange);
 
 async function initializePopup() {
+  updateUploadPreview(null);
+
   try {
-    const sessionState = await syncStoredSessionFromCookie();
+    const [sessionState, activeTab] = await Promise.all([
+      refreshSessionState({ preserveStatus: true }),
+      loadActiveTabPreview(),
+    ]);
+
     popupSessionState = sessionState;
+    popupViewState.activeTab = activeTab;
+
+    updateCurrentPagePreview(activeTab);
+    updateSessionPanel(sessionState);
+    updateControlAvailability();
 
     if (sessionState.ready) {
-      setStatus('idle', 'Ready to save this page.');
+      setStatus('idle', 'Choose how you want to save this content.');
       return;
     }
 
     if (sessionState.networkError) {
-      setStatus('error', 'Unable to reach the server. Check your connection and try again.');
+      setStatus('error', 'Unable to reach the server. Check your backend or connection and try again.');
       return;
     }
 
-    setStatus('error', 'Please login first');
+    setStatus('error', 'Login required. Open the web app and sign in first.');
   } catch {
     popupSessionState = {
       ready: false,
       networkError: true,
       apiBaseUrl: DEFAULT_API_BASE_URL,
     };
-    setStatus('error', 'Unable to reach the server. Check your connection and try again.');
+    updateSessionPanel(popupSessionState);
+    updateControlAvailability();
+    setStatus('error', 'Unable to initialize the extension right now.');
   }
 }
 
-async function handleSaveClick() {
-  setLoadingState(true);
-  setStatus('loading', 'Saving...');
+async function handleSessionActionClick() {
+  if (popupSessionState.ready) {
+    const session = await getStoredSession();
+    await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), DASHBOARD_ROUTE);
+    return;
+  }
+
+  if (popupSessionState.networkError) {
+    setStatus('loading', 'Retrying session check...');
+    await refreshSessionState({ preserveStatus: false });
+    updateSessionPanel(popupSessionState);
+    updateControlAvailability();
+
+    if (popupSessionState.ready) {
+      setStatus('success', 'Connected. You can save content now.');
+    } else if (popupSessionState.networkError) {
+      setStatus('error', 'Still unable to reach the server. Check your backend and try again.');
+    } else {
+      setStatus('error', 'Login required. Open the web app and sign in first.');
+    }
+    return;
+  }
+
+  const session = await getStoredSession();
+  await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), LOGIN_ROUTE);
+}
+
+async function handleSaveCurrentPageClick() {
+  await runPopupAction({
+    actionButton: saveCurrentPageButton,
+    loadingLabel: 'Saving Current Page...',
+    loadingStatus: 'Saving the current page...',
+    successStatus: 'Current page saved. Opening dashboard...',
+    work: async (session) => {
+      const activeTab = popupViewState.activeTab || await loadActiveTabPreview();
+
+      if (!activeTab?.id || !activeTab.supported) {
+        throw new Error('Open a normal website page before saving the current tab.');
+      }
+
+      const pageData = await extractPageData(activeTab);
+      return saveUrlContent(session.apiBaseUrl, session.token, pageData);
+    },
+    afterSuccess: async () => {
+      await wait(320);
+      const session = await getStoredSession();
+      await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), DASHBOARD_ROUTE);
+    },
+  });
+}
+
+async function handleSaveLinkSubmit(event) {
+  event.preventDefault();
+
+  const normalizedUrl = String(linkInput.value || '').trim();
+
+  if (!normalizedUrl) {
+    setStatus('error', 'Paste a link you want to save.');
+    linkInput.focus();
+    return;
+  }
+
+  if (!isSupportedPage(normalizedUrl)) {
+    setStatus('error', 'Enter a valid link starting with http:// or https://.');
+    linkInput.focus();
+    return;
+  }
+
+  await runPopupAction({
+    actionButton: saveLinkButton,
+    loadingLabel: 'Saving Link...',
+    loadingStatus: 'Saving the pasted link...',
+    successStatus: 'Link saved. Opening dashboard...',
+    work: async (session) => saveUrlContent(session.apiBaseUrl, session.token, {
+      url: normalizedUrl,
+      title: '',
+      description: '',
+      image: '',
+    }),
+    afterSuccess: async () => {
+      linkInput.value = '';
+      await wait(320);
+      const session = await getStoredSession();
+      await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), DASHBOARD_ROUTE);
+    },
+  });
+}
+
+async function handleUploadSubmit(event) {
+  event.preventDefault();
+
+  const selectedFile = fileInput.files?.[0] || null;
+
+  if (!selectedFile) {
+    setStatus('error', 'Choose a PDF or image before uploading.');
+    fileInput.focus();
+    return;
+  }
+
+  if (!isSupportedUploadFile(selectedFile)) {
+    setStatus('error', 'Only PDF and image files are supported.');
+    return;
+  }
+
+  await runPopupAction({
+    actionButton: uploadFileButton,
+    loadingLabel: 'Uploading File...',
+    loadingStatus: 'Uploading the file to your library...',
+    successStatus: 'File uploaded. Opening dashboard...',
+    work: async (session) => {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const normalizedTitle = String(fileTitleInput.value || '').trim();
+      if (normalizedTitle) {
+        formData.append('title', normalizedTitle);
+      }
+
+      return uploadFileContent(session.apiBaseUrl, session.token, formData);
+    },
+    afterSuccess: async () => {
+      fileInput.value = '';
+      fileTitleInput.value = '';
+      updateUploadPreview(null);
+      await wait(320);
+      const session = await getStoredSession();
+      await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), DASHBOARD_ROUTE);
+    },
+  });
+}
+
+function handleFileInputChange(event) {
+  const selectedFile = event.target.files?.[0] || null;
+
+  if (selectedFile && !isSupportedUploadFile(selectedFile)) {
+    event.target.value = '';
+    updateUploadPreview(null);
+    setStatus('error', 'Only PDF and image files are supported.');
+    return;
+  }
+
+  updateUploadPreview(selectedFile);
+
+  if (selectedFile) {
+    setStatus('idle', 'File selected. Upload it whenever you are ready.');
+  }
+}
+
+async function runPopupAction({
+  actionButton,
+  loadingLabel,
+  loadingStatus,
+  successStatus,
+  work,
+  afterSuccess,
+}) {
+  setActionLoading(actionButton, loadingLabel, true);
+  setStatus('loading', loadingStatus);
 
   try {
-    await initializationPromise;
+    const session = await ensureAuthenticatedSession();
 
-    const session = await getStoredSession();
-
-    if (!popupSessionState.ready && popupSessionState.networkError) {
-      throw new Error('Unable to reach the server. Check your connection and try again.');
-    }
-
-    if (!session.token) {
-      setStatus('error', 'Please login first');
-      await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), LOGIN_ROUTE);
+    if (!session) {
       return;
     }
 
-    const activeTab = await getActiveTab();
+    await work(session);
 
-    if (!activeTab?.id || !isSupportedPage(activeTab.url)) {
-      throw new Error('Open a normal website page before saving it.');
+    popupSessionState = {
+      ...popupSessionState,
+      ready: true,
+      networkError: false,
+      apiBaseUrl: session.apiBaseUrl,
+    };
+    updateSessionPanel(popupSessionState);
+    updateControlAvailability();
+    setStatus('success', successStatus);
+
+    if (typeof afterSuccess === 'function') {
+      await afterSuccess();
     }
-
-    const pageData = await extractPageData(activeTab);
-    const result = await savePage(session.apiBaseUrl, session.token, pageData);
-
-    setStatus('success', 'Saved! Opening dashboard...');
-    await wait(300);
-    await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), DASHBOARD_ROUTE);
-    popupSessionState = { ...popupSessionState, ready: true };
-    return result;
   } catch (error) {
     if (error?.code === 'UNAUTHORIZED') {
       await clearStoredToken();
@@ -91,14 +284,73 @@ async function handleSaveClick() {
         networkError: false,
         apiBaseUrl: error.apiBaseUrl || popupSessionState.apiBaseUrl || DEFAULT_API_BASE_URL,
       };
-      setStatus('error', 'Please login first');
+      updateSessionPanel(popupSessionState);
+      updateControlAvailability();
+      setStatus('error', 'Please login first.');
       await openOrFocusFrontendPage(resolveFrontendBaseUrl(popupSessionState.apiBaseUrl), LOGIN_ROUTE);
       return;
     }
 
     setStatus('error', mapErrorToMessage(error));
   } finally {
-    setLoadingState(false);
+    setActionLoading(actionButton, loadingLabel, false);
+  }
+}
+
+async function ensureAuthenticatedSession() {
+  await initializationPromise;
+
+  const storedSession = await getStoredSession();
+
+  if (popupSessionState.ready && storedSession.token) {
+    return storedSession;
+  }
+
+  const refreshedSessionState = await refreshSessionState({ preserveStatus: true });
+  popupSessionState = refreshedSessionState;
+  updateSessionPanel(refreshedSessionState);
+  updateControlAvailability();
+
+  const refreshedSession = await getStoredSession();
+
+  if (refreshedSessionState.ready && refreshedSession.token) {
+    return refreshedSession;
+  }
+
+  if (refreshedSessionState.networkError) {
+    throw new Error('Unable to reach the server. Check your backend or connection and try again.');
+  }
+
+  setStatus('error', 'Please login first.');
+  await openOrFocusFrontendPage(resolveFrontendBaseUrl(refreshedSession.apiBaseUrl), LOGIN_ROUTE);
+  return null;
+}
+
+async function refreshSessionState({ preserveStatus = false } = {}) {
+  if (!preserveStatus) {
+    updateSessionPanel({
+      ready: false,
+      networkError: false,
+      apiBaseUrl: popupSessionState.apiBaseUrl || DEFAULT_API_BASE_URL,
+    }, {
+      badgeState: 'loading',
+      badgeLabel: 'Checking',
+      title: 'Checking your login...',
+      description: 'We are verifying your session with the web app.',
+    });
+  }
+
+  try {
+    const sessionState = await syncStoredSessionFromCookie();
+    popupSessionState = sessionState;
+    return sessionState;
+  } catch {
+    popupSessionState = {
+      ready: false,
+      networkError: true,
+      apiBaseUrl: DEFAULT_API_BASE_URL,
+    };
+    return popupSessionState;
   }
 }
 
@@ -147,6 +399,195 @@ async function syncStoredSessionFromCookie() {
     networkError: hadRetryableError,
     apiBaseUrl: storedSession.apiBaseUrl,
   };
+}
+
+async function loadActiveTabPreview() {
+  const activeTab = await getActiveTab();
+
+  if (!activeTab) {
+    return null;
+  }
+
+  return {
+    id: activeTab.id,
+    url: String(activeTab.url || '').trim(),
+    title: String(activeTab.title || 'Untitled page').trim() || 'Untitled page',
+    supported: isSupportedPage(activeTab.url),
+  };
+}
+
+function updateCurrentPagePreview(activeTab) {
+  if (!activeTab) {
+    activePageTitle.textContent = 'No active tab found';
+    activePageUrl.textContent = 'Open a website tab and reopen the popup to save the current page.';
+    saveCurrentPageButton.textContent = 'Save Current Page';
+    saveCurrentPageButton.disabled = true;
+    return;
+  }
+
+  activePageTitle.textContent = activeTab.title;
+  activePageUrl.textContent = activeTab.supported
+    ? activeTab.url
+    : 'This tab cannot be saved. Open a regular http or https page.';
+  saveCurrentPageButton.textContent = buttonLabels.saveCurrentPageButton;
+  saveCurrentPageButton.disabled = !popupSessionState.ready || !activeTab.supported;
+}
+
+function updateUploadPreview(file) {
+  if (!file) {
+    fileName.textContent = 'Choose a PDF or image';
+    fileMeta.textContent = 'The file will be uploaded, tagged, and added to your library.';
+    return;
+  }
+
+  const normalizedType = isPdfFile(file) ? 'PDF' : 'Image';
+  fileName.textContent = file.name;
+  fileMeta.textContent = `${normalizedType} - ${formatFileSize(file.size)}`;
+}
+
+function updateSessionPanel(sessionState, overrides = {}) {
+  if (overrides.title) {
+    sessionTitle.textContent = overrides.title;
+    sessionDescription.textContent = overrides.description;
+    sessionBadge.dataset.state = overrides.badgeState;
+    sessionBadge.textContent = overrides.badgeLabel;
+    sessionActionButton.textContent = 'Please wait...';
+    sessionActionButton.disabled = true;
+    return;
+  }
+
+  if (sessionState.ready) {
+    sessionTitle.textContent = 'Connected to your Second Brain';
+    sessionDescription.textContent = 'All save actions are ready. You can capture the current page, paste another link, or upload a file.';
+    sessionBadge.dataset.state = 'success';
+    sessionBadge.textContent = 'Ready';
+    sessionActionButton.textContent = 'Open Library';
+    sessionActionButton.disabled = false;
+    return;
+  }
+
+  if (sessionState.networkError) {
+    sessionTitle.textContent = 'Unable to verify the server right now';
+    sessionDescription.textContent = 'The popup cannot reach your backend at the moment. Retry the session check after your server is running again.';
+    sessionBadge.dataset.state = 'error';
+    sessionBadge.textContent = 'Offline';
+    sessionActionButton.textContent = 'Retry Session';
+    sessionActionButton.disabled = false;
+    return;
+  }
+
+  sessionTitle.textContent = 'Login required before saving';
+  sessionDescription.textContent = 'Sign in through the web app first, then reopen the extension to save pages, links, and uploads into your library.';
+  sessionBadge.dataset.state = 'error';
+  sessionBadge.textContent = 'Login';
+  sessionActionButton.textContent = 'Open Login';
+  sessionActionButton.disabled = false;
+}
+
+function updateControlAvailability() {
+  const isReady = popupSessionState.ready;
+  const currentTabSupported = Boolean(popupViewState.activeTab?.supported);
+
+  linkInput.disabled = !isReady;
+  saveLinkButton.disabled = !isReady;
+  fileInput.disabled = !isReady;
+  fileTitleInput.disabled = !isReady;
+  uploadFileButton.disabled = !isReady;
+  saveCurrentPageButton.disabled = !isReady || !currentTabSupported;
+
+  if (!activeActionButton) {
+    saveCurrentPageButton.textContent = buttonLabels.saveCurrentPageButton;
+    saveLinkButton.textContent = buttonLabels.saveLinkButton;
+    uploadFileButton.textContent = buttonLabels.uploadFileButton;
+  }
+}
+
+function setActionLoading(actionButton, loadingLabel, isLoading) {
+  activeActionButton = isLoading ? actionButton : null;
+
+  const allControls = [
+    saveCurrentPageButton,
+    linkInput,
+    saveLinkButton,
+    fileInput,
+    fileTitleInput,
+    uploadFileButton,
+    sessionActionButton,
+  ];
+
+  allControls.forEach((control) => {
+    if (!control) {
+      return;
+    }
+
+    control.disabled = isLoading;
+  });
+
+  if (actionButton) {
+    actionButton.textContent = isLoading ? loadingLabel : buttonLabels[actionButton.id] || actionButton.textContent;
+  }
+
+  if (!isLoading) {
+    updateSessionPanel(popupSessionState);
+    updateControlAvailability();
+    updateCurrentPagePreview(popupViewState.activeTab);
+  }
+}
+
+async function saveUrlContent(apiBaseUrl, token, pageData) {
+  const response = await fetch(`${apiBaseUrl}${SAVE_ENDPOINT}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      url: pageData.url,
+      title: pageData.title,
+      description: pageData.description,
+      image: pageData.image,
+    }),
+  });
+  const payload = await parseJsonSafe(response);
+
+  if (response.status === 401) {
+    throw createUnauthorizedError(getResponseMessage(payload, 'Please login first'), apiBaseUrl);
+  }
+
+  if (!response.ok) {
+    throw new Error(getResponseMessage(payload, 'Failed to save content.'));
+  }
+
+  if (!payload || typeof payload !== 'object' || payload.success !== true) {
+    throw createInvalidResponseError();
+  }
+
+  return payload;
+}
+
+async function uploadFileContent(apiBaseUrl, token, formData) {
+  const response = await fetch(`${apiBaseUrl}${UPLOAD_ENDPOINT}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const payload = await parseJsonSafe(response);
+
+  if (response.status === 401) {
+    throw createUnauthorizedError(getResponseMessage(payload, 'Please login first'), apiBaseUrl);
+  }
+
+  if (!response.ok) {
+    throw new Error(getResponseMessage(payload, 'Failed to upload file.'));
+  }
+
+  if (!payload || typeof payload !== 'object' || payload.success !== true) {
+    throw createInvalidResponseError();
+  }
+
+  return payload;
 }
 
 async function getStoredSession() {
@@ -218,37 +659,6 @@ async function checkAuthStatus(apiBaseUrl, token) {
   } catch {
     return { success: false, retryableError: true, message: 'Unable to reach the server. Check your connection and try again.' };
   }
-}
-
-async function savePage(apiBaseUrl, token, pageData) {
-  const response = await fetch(`${apiBaseUrl}${SAVE_ENDPOINT}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      url: pageData.url,
-      title: pageData.title,
-      description: pageData.description,
-      image: pageData.image,
-    }),
-  });
-  const payload = await parseJsonSafe(response);
-
-  if (response.status === 401) {
-    throw createUnauthorizedError(getResponseMessage(payload, 'Please login first'), apiBaseUrl);
-  }
-
-  if (!response.ok) {
-    throw new Error(getResponseMessage(payload, 'Failed to save'));
-  }
-
-  if (!payload || typeof payload !== 'object' || payload.success !== true) {
-    throw createInvalidResponseError();
-  }
-
-  return payload;
 }
 
 async function getActiveTab() {
@@ -400,9 +810,36 @@ function isSupportedPage(url) {
   }
 }
 
-function setLoadingState(isLoading) {
-  saveButton.disabled = isLoading;
-  saveButton.textContent = isLoading ? 'Saving...' : 'Save Page';
+function isSupportedUploadFile(file) {
+  if (!file) {
+    return false;
+  }
+
+  const normalizedType = String(file.type || '').toLowerCase();
+  const normalizedName = String(file.name || '').toLowerCase();
+
+  return normalizedType === 'application/pdf'
+    || normalizedType.startsWith('image/')
+    || /\.(pdf|png|jpe?g|webp|gif|bmp|svg)$/i.test(normalizedName);
+}
+
+function isPdfFile(file) {
+  const normalizedType = String(file?.type || '').toLowerCase();
+  const normalizedName = String(file?.name || '').toLowerCase();
+
+  return normalizedType === 'application/pdf' || normalizedName.endsWith('.pdf');
+}
+
+function formatFileSize(size) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return 'Unknown size';
+  }
+
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function setStatus(state, message) {
@@ -425,22 +862,22 @@ function createInvalidResponseError() {
 
 function mapErrorToMessage(error) {
   if (error?.code === 'UNAUTHORIZED') {
-    return 'Please login first';
+    return 'Please login first.';
   }
 
   if (error?.code === 'INVALID_RESPONSE') {
-    return 'Failed to save';
+    return 'The server returned an invalid response.';
   }
 
   if (error instanceof TypeError) {
-    return 'Unable to reach the server. Check your connection and try again.';
+    return 'Unable to reach the server. Check your backend or connection and try again.';
   }
 
   if (typeof error?.message === 'string' && error.message.trim()) {
     return error.message.trim();
   }
 
-  return 'Failed to save';
+  return 'Something went wrong while saving.';
 }
 
 function wait(duration) {

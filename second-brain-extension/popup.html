@@ -8,12 +8,111 @@
 </head>
 <body>
   <main class="popup">
-    <h1 class="popup__title">Second Brain</h1>
-    <p class="popup__subtitle">Save the current page to your library.</p>
+    <header class="hero">
+      <div class="hero__copy">
+        <p class="hero__eyebrow">Second Brain Extension</p>
+        <h1 class="hero__title">Capture pages, links, and files in one place.</h1>
+        <p class="hero__subtitle">
+          Save the current tab, paste any other link, or upload a PDF/image without leaving your browser.
+        </p>
+      </div>
 
-    <button id="saveButton" class="popup__button" type="button">Save Page</button>
+      <button id="sessionActionButton" class="button button--ghost" type="button">
+        Checking session...
+      </button>
+    </header>
 
-    <p id="status" class="popup__status" data-state="idle" aria-live="polite">
+    <section class="panel panel--session">
+      <div class="panel__header">
+        <div>
+          <p class="panel__eyebrow">Session</p>
+          <h2 id="sessionTitle" class="panel__title">Checking your login...</h2>
+        </div>
+        <span id="sessionBadge" class="badge" data-state="loading">Checking</span>
+      </div>
+      <p id="sessionDescription" class="panel__description">
+        We verify your web app session before enabling save actions.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header panel__header--stacked">
+        <div>
+          <p class="panel__eyebrow">Current Page</p>
+          <h2 class="panel__title">Save what you are viewing now</h2>
+        </div>
+      </div>
+
+      <div class="page-preview">
+        <p id="activePageTitle" class="page-preview__title">Loading active tab...</p>
+        <p id="activePageUrl" class="page-preview__url">Checking the current page...</p>
+      </div>
+
+      <button id="saveCurrentPageButton" class="button button--primary" type="button">
+        Save Current Page
+      </button>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header panel__header--stacked">
+        <div>
+          <p class="panel__eyebrow">Any Link</p>
+          <h2 class="panel__title">Paste another URL to save</h2>
+        </div>
+      </div>
+
+      <form id="linkForm" class="form-stack">
+        <label class="field">
+          <span class="field__label">Link URL</span>
+          <input
+            id="linkInput"
+            class="field__input"
+            type="url"
+            inputmode="url"
+            placeholder="Paste any article, YouTube, tweet, or resource URL"
+            autocomplete="off"
+          >
+        </label>
+
+        <button id="saveLinkButton" class="button button--secondary" type="submit">
+          Save Pasted Link
+        </button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header panel__header--stacked">
+        <div>
+          <p class="panel__eyebrow">Upload File</p>
+          <h2 class="panel__title">Add a PDF or image from your device</h2>
+        </div>
+      </div>
+
+      <form id="uploadForm" class="form-stack">
+        <label class="upload-dropzone" for="fileInput">
+          <input id="fileInput" class="upload-dropzone__input" type="file" accept="application/pdf,image/*">
+          <span id="fileName" class="upload-dropzone__title">Choose a PDF or image</span>
+          <span id="fileMeta" class="upload-dropzone__meta">The file will be uploaded, tagged, and added to your library.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Optional title</span>
+          <input
+            id="fileTitleInput"
+            class="field__input"
+            type="text"
+            placeholder="Give the upload a custom title if you want"
+            autocomplete="off"
+          >
+        </label>
+
+        <button id="uploadFileButton" class="button button--secondary" type="submit">
+          Upload File
+        </button>
+      </form>
+    </section>
+
+    <p id="status" class="status" data-state="idle" aria-live="polite">
       Checking session...
     </p>
   </main>
