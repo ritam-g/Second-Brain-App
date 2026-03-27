@@ -32,6 +32,7 @@ import {
   getFallbackImage,
 } from './utils';
 import { useDeleteContent } from '../../hooks/useContent';
+import { useContentViewerActions } from '../../hooks/useContentViewer';
 
 /**
  * ContentCard Component
@@ -40,6 +41,7 @@ import { useDeleteContent } from '../../hooks/useContent';
  */
 const ContentCard = ({ content, index }) => {
   const { deleteContent, loading } = useDeleteContent();
+  const { openViewer } = useContentViewerActions();
   const deleteId = content?.deleteId || content?.contentId || content?._id;
   const variant = getCardVariant(content, index);
   const kind = getContentKind(content);
@@ -67,6 +69,7 @@ const ContentCard = ({ content, index }) => {
 
   const handleDelete = async (event) => {
     event.preventDefault();
+    event.stopPropagation();
 
     if (!deleteId) {
       return;
@@ -75,6 +78,11 @@ const ContentCard = ({ content, index }) => {
     if (window.confirm('Delete this archive entry?')) {
       await deleteContent(deleteId);
     }
+  };
+
+  const handleOpenViewer = (event) => {
+    event.preventDefault();
+    openViewer(content);
   };
 
   // Fall back to generated artwork so broken external previews do not collapse card layout.
@@ -99,16 +107,13 @@ const ContentCard = ({ content, index }) => {
       data-variant={variant}
       data-preview-type={previewType}
     >
-      {previewType !== 'youtube' && destinationUrl && destinationUrl !== '#' ? (
-        <a
-          href={destinationUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Open ${displayTitle}`}
-          className="content-card-link debug-content-card-link absolute inset-0 z-10 rounded-[28px]"
-          data-debug="content-card-link"
-        />
-      ) : null}
+      <button
+        type="button"
+        aria-label={`Open ${displayTitle} inside viewer`}
+        onClick={handleOpenViewer}
+        className="content-card-link debug-content-card-link absolute inset-0 z-10 rounded-[28px] bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        data-debug="content-card-link"
+      />
 
       <CardOverlayActions href={destinationUrl} onDelete={handleDelete} loading={loading} />
 

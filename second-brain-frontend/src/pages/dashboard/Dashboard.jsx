@@ -6,12 +6,14 @@ import SaveLinkPanel from '../../features/content-ingest/components/SaveLinkPane
 import UploadPanel from '../../features/content-ingest/components/UploadPanel';
 import MasonryGrid from '../../components/content/MasonryGrid';
 import ContentCard from '../../components/content/ContentCard';
+import ContentViewer from '../../components/content/ContentViewer';
 import TagChip from '../../components/content/TagChip';
 import { normalizeContentCollection } from '../../components/content/utils';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
 import ResurfacingSection from '../../features/resurfacing/components/ResurfacingSection';
 import { useGetContent, useSaveContent, useFilteredContent, useUploadContent } from '../../hooks/useContent';
+import { useContentViewer } from '../../hooks/useContentViewer';
 import { useLogout } from '../../hooks/useAuth';
 import { useSemanticSearch } from '../../features/search/hooks/useSemanticSearch';
 import { notify } from '../../utils/toast';
@@ -30,6 +32,7 @@ const Dashboard = () => {
   const { saveContent, loading: saveLoading } = useSaveContent();
   const { upload, loading: uploadLoading } = useUploadContent();
   const { performLogout, loading: logoutLoading } = useLogout();
+  const { selectedContent, isViewerOpen, closeViewer } = useContentViewer();
   const {
     query: searchQuery,
     setQuery: setSearchQuery,
@@ -72,6 +75,10 @@ const Dashboard = () => {
     window.clearTimeout(highlightTimeoutRef.current);
     window.cancelAnimationFrame(canvasFocusFrameRef.current);
   }, []);
+
+  useEffect(() => () => {
+    closeViewer();
+  }, [closeViewer]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -495,6 +502,12 @@ const Dashboard = () => {
           </div>
         </section>
       </div>
+
+      <ContentViewer
+        content={selectedContent}
+        isOpen={isViewerOpen}
+        onClose={closeViewer}
+      />
     </MainLayout>
   );
 };

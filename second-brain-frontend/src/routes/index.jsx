@@ -5,6 +5,7 @@ import Register from '../pages/auth/Register';
 import Dashboard from '../pages/dashboard/Dashboard';
 import DeepFocus from '../pages/DeepFocus';
 import { ProtectedRoute, PublicRoute } from './RouteGuards';
+import RouteLoadingFallback from './RouteLoadingFallback';
 
 const GraphPage = lazy(() => import('../pages/GraphPage'));
 
@@ -67,11 +68,3 @@ export const router = createBrowserRouter([
     element: <Navigate to="/" replace />
   }
 ]);
-
-function RouteLoadingFallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-obsidian-900 text-sm font-semibold uppercase tracking-[0.2em] text-obsidian-500">
-      Loading workspace...
-    </div>
-  );
-}

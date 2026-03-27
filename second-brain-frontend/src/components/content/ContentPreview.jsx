@@ -73,7 +73,7 @@ const ContentPreview = ({
   );
 };
 
-function PreviewHint({ icon: Icon, label, href }) {
+function PreviewHint({ icon, label, href }) {
   if (!href) {
     return null;
   }
@@ -85,7 +85,7 @@ function PreviewHint({ icon: Icon, label, href }) {
       rel="noopener noreferrer"
       className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,241,214,0.14)] bg-[rgba(12,9,8,0.66)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#fff3db] backdrop-blur-xl transition-colors hover:border-[rgba(255,191,64,0.22)] hover:text-accent"
     >
-      <Icon className="h-3.5 w-3.5" />
+      {React.createElement(icon, { className: 'h-3.5 w-3.5' })}
       {label}
     </a>
   );
