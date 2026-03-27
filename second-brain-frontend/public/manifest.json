@@ -1,0 +1,21 @@
+{
+  "short_name": "DataNest",
+  "name": "DataNest AI — Your AI-Powered Personal Knowledge System",
+  "description": "The ultimate personal knowledge engine using AI, semantic search, and knowledge graphs to organize your digital notes and media.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#120d0a",
+  "theme_color": "#f8ae1d",
+  "icons": [
+    {
+      "src": "/Product.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/Product.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

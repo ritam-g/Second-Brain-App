@@ -53,8 +53,8 @@ const Sidebar = ({
 
         {!isCompact || isMobile ? (
           <div className="min-w-0 flex-1">
-            <p className="text-[1.45rem] font-extrabold leading-tight text-[#f8e5c5]">The Obsidian Archive</p>
-            <p className="mt-1 text-[11px] uppercase tracking-[0.28em] text-obsidian-500">Second Brain</p>
+            <p className="text-[1.45rem] font-extrabold leading-tight text-[#f8e5c5]">DataNest AI</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.28em] text-obsidian-500">Knowledge Hub</p>
           </div>
         ) : null}
 

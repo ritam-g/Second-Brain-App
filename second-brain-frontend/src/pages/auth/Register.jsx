@@ -45,7 +45,7 @@ const Register = () => {
           <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-primary/30 mb-4">
             <BrainCircuit className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-slate-800">Second Brain</h2>
+          <h2 className="text-3xl font-bold text-slate-800">DataNest AI</h2>
           <p className="text-slate-500 mt-2 text-center text-sm">Start your digital curation journey.</p>
         </div>
 
@@ -80,7 +80,7 @@ const Register = () => {
             className="w-full py-3 mt-6 text-base rounded-xl"
             loading={loading}
           >
-            Create My Second Brain
+            Create My DataNest AI account
           </Button>
         </form>
 
