@@ -71,7 +71,7 @@ function resolveResurfacingDebugMode() {
     return false;
   }
 
-  return Boolean(import.meta.env.DEV);
+  return false;
 }
 
 function readDebugQueryOverride() {

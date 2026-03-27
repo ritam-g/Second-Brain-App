@@ -169,11 +169,11 @@ async function findResurfacingCandidates({ userId, dateWindow }) {
         .lean()
 }
 
-// Logs the active resurfacing range so empty states during testing are explainable instead of invisible.
+// Logs the active resurfacing range only during explicit debug sessions.
 // Input: user id, monthsAgo, debug flag, chosen date window, and number of matching items.
-// Output: none. Emits console logs in debug and non-production sessions.
+// Output: none. Emits console logs when resurfacing debug mode is enabled.
 function logResurfacingWindow({ userId, monthsAgo, debug, dateWindow, itemsFound }) {
-    if (process.env.NODE_ENV === "production" && !debug) {
+    if (!debug) {
         return
     }
 
