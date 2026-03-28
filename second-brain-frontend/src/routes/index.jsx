@@ -4,6 +4,7 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import Dashboard from '../pages/dashboard/Dashboard';
 import DeepFocus from '../pages/DeepFocus';
+import LandingPage from '../pages/LandingPage';
 import { ProtectedRoute, PublicRoute } from './RouteGuards';
 import RouteLoadingFallback from './RouteLoadingFallback';
 
@@ -18,7 +19,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: (
       <PublicRoute>
-        <Navigate to="/login" replace />
+        <LandingPage />
       </PublicRoute>
     ),
   },

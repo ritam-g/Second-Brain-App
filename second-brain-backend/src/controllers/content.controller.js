@@ -322,7 +322,7 @@ export async function uploadContentController(req, res) {
                     metadata: {
                         userId,
                         title: uploadMetadata.title,
-                        contentId,//and in model also wer are saving the _id is content id 
+                        contentId,//!in model also wer are saving the _id is content id 
                         type: uploadType,
                         url: uploadedFile.url,
                         image: previewImage,
@@ -335,7 +335,7 @@ export async function uploadContentController(req, res) {
 
         // Save the final content document with both UI metadata and vector mapping fields.
         const content = await contentModel.create({
-            _id: contentObjectId,//ths the game changer we are fetch result from pincode by this 
+            _id: contentObjectId,//!ths the game changer we are fetch result from pincode by this 
             userId,
             title: uploadMetadata.title,
             description: uploadMetadata.description,
