@@ -469,7 +469,7 @@ function updateSessionPanel(sessionState, overrides = {}) {
   }
 
   if (sessionState.networkError) {
-    sessionTitle.textContent = 'Unable to verify the server right now';
+    sessionTitle.innerHTML = `<a href="https://datanest-ai.onrender.com/login" target="_blank">Unable to verify the server right now click</a>`;
     sessionDescription.textContent = 'The popup cannot reach your backend at the moment. Retry the session check after your server is running again.';
     sessionBadge.dataset.state = 'error';
     sessionBadge.textContent = 'Offline';
