@@ -1,6 +1,6 @@
 const DEFAULT_API_BASE_URL = 'http://localhost:3000/api';
 const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:5173';
-const RENDER_API_BASE_URL = 'https://second-brain-app.onrender.com/api';
+const RENDER_API_BASE_URL = 'https://datanest-ai.onrender.com/api';
 const AUTH_COOKIE_NAME = 'jwtToken';
 const SAVE_ENDPOINT = '/content/save';
 const UPLOAD_ENDPOINT = '/content/upload';
@@ -82,7 +82,9 @@ async function initializePopup() {
       return;
     }
 
-    setStatus('error', 'Login required. Open the web app and sign in first.');
+    setStatus('error', 'Login required. Redirecting to sign in...');
+    const session = await getStoredSession();
+    await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), LOGIN_ROUTE);
   } catch {
     popupSessionState = {
       ready: false,
