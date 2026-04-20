@@ -10,6 +10,7 @@ import {
 } from "../controllers/content.controller.js"
 import { AuthMiddleware } from "../middleware/auth_middleware.js"
 import { upload } from "../middleware/upload_middleware.js"
+import { uploadLimiter, generalLimiter } from "../middleware/rateLimiter/rateLimiter.js"
 
 const contentRouter = Router()
 
@@ -82,7 +83,7 @@ contentRouter.get("/image-proxy", proxyContentImageController)
  *       500:
  *         description: Internal server error
  */
-contentRouter.post("/save", AuthMiddleware, saveContentController)
+contentRouter.post("/save",  uploadLimiter,AuthMiddleware, saveContentController)
 
 /**  
  * @swagger
@@ -114,7 +115,7 @@ contentRouter.post("/save", AuthMiddleware, saveContentController)
  *       500:
  *         description: Internal server error
  */
-contentRouter.post("/upload", AuthMiddleware, upload.single("file"), uploadContentController)
+contentRouter.post("/upload",uploadLimiter, AuthMiddleware,  upload.single("file"), uploadContentController)
 
 /**   
  * @swagger
@@ -139,7 +140,7 @@ contentRouter.post("/upload", AuthMiddleware, upload.single("file"), uploadConte
  *                   items:
  *                     $ref: '#/components/schemas/Content'
  */
-contentRouter.get("/get-all", AuthMiddleware, getContentAllController)
+contentRouter.get("/get-all",generalLimiter, AuthMiddleware,  getContentAllController)
 
 /**   
  * @swagger
@@ -162,9 +163,9 @@ contentRouter.get("/get-all", AuthMiddleware, getContentAllController)
  *       404:
  *         description: Content not found
  */
-contentRouter.delete("/delete/:id", AuthMiddleware, DeleteContentController)
+contentRouter.delete("/delete/:id",generalLimiter, AuthMiddleware,  DeleteContentController)
 
-contentRouter.delete("/clear-all", AuthMiddleware, clearAllContentController)
+contentRouter.delete("/clear-all",generalLimiter, AuthMiddleware,  clearAllContentController)
 
 /**   
  * @swagger
@@ -189,6 +190,6 @@ contentRouter.delete("/clear-all", AuthMiddleware, clearAllContentController)
  *                   items:
  *                     $ref: '#/components/schemas/Content'
  */
-contentRouter.get("/get-single-user", AuthMiddleware, getSingleUserContentController)
+contentRouter.get("/get-single-user",generalLimiter, AuthMiddleware,  getSingleUserContentController)
 
 export default contentRouter

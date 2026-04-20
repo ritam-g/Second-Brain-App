@@ -9,6 +9,7 @@ import {
   userLoginController,
 } from '../controllers/auth.controller.js'
 import { AuthMiddleware } from '../middleware/auth_middleware.js'
+import { authLimiter, generalLimiter } from '../middleware/rateLimiter/rateLimiter.js'
 
 /**   
  * @swagger
@@ -52,7 +53,7 @@ const authRouter = Router()
  *       400:
  *         description: Validation error
  */
-authRouter.post('/register', registerController)
+authRouter.post('/register', authLimiter, registerController)
 
 /**  
  * @swagger
@@ -80,7 +81,7 @@ authRouter.post('/register', registerController)
  *       401:
  *         description: Invalid credentials
  */
-authRouter.post('/login', userLoginController)
+authRouter.post('/login', authLimiter, userLoginController)
 
 /**  
  * @swagger
@@ -94,13 +95,13 @@ authRouter.post('/login', userLoginController)
  *       401:
  *         description: Unauthorized
  */
-authRouter.get('/me', AuthMiddleware, checkAuthController)
+authRouter.get('/me',generalLimiter,  AuthMiddleware, checkAuthController)
 
-authRouter.patch('/profile', AuthMiddleware, updateProfileController)
+authRouter.patch('/profile',generalLimiter,  AuthMiddleware,  updateProfileController)
 
-authRouter.patch('/password', AuthMiddleware, changePasswordController)
+authRouter.patch('/password',authLimiter, AuthMiddleware,  changePasswordController)
 
-authRouter.delete('/account', AuthMiddleware, deleteAccountController)
+authRouter.delete('/account',generalLimiter,  AuthMiddleware,  deleteAccountController)
 
 /**  
  * @swagger
@@ -112,6 +113,6 @@ authRouter.delete('/account', AuthMiddleware, deleteAccountController)
  *       200:
  *         description: Logout successful
  */
-authRouter.post('/logout', logoutController)
+authRouter.post('/logout', authLimiter, logoutController)
 
 export default authRouter

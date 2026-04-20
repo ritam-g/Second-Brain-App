@@ -116,5 +116,79 @@ npm run dev
 5. **View Graph:** Click over to the Graph visualizer to see how your saved ideas intersect visually.
 6. **Deep Focus:** Enter the chat area to ask specific questions about the data you've archived.
 
-## 📸 Screenshots
+## � Rate Limiting
+
+The backend implements comprehensive rate limiting to protect the system from abuse and ensure fair usage across all users.
+
+### Why Rate Limiting?
+- **Security:** Prevents brute-force attacks on authentication endpoints
+- **Resource Protection:** Prevents abuse of computationally expensive operations (AI processing, uploads)
+- **Fair Usage:** Ensures all users get fair access to shared resources
+- **Cost Control:** Prevents runaway API costs from external services (Mistral AI, Pinecone, ImageKit)
+
+### Rate Limit Configuration
+
+Different routes have different limits based on computational cost and security sensitivity:
+
+| Route Type | Limit | Window | Reason |
+|-----------|-------|--------|--------|
+| **Authentication** (login, register, password change) | 5 requests | 1 minute | Prevent brute-force attacks |
+| **Upload** (file uploads, URL saves) | 10 requests | 10 minutes | Resource-intensive, quota-sensitive |
+| **AI/Chat** (RAG queries) | 20 requests | 5 minutes | Computationally expensive, token-costly |
+| **Search** (semantic search) | 50 requests | 1 minute | Medium priority, vectorization cost |
+| **Graph** (relationship queries) | 30 requests | 1 minute | Medium complexity queries |
+| **Resurfacing** (memory recall) | 30 requests | 1 minute | Medium complexity queries |
+| **General API** (content management, retrieval) | 100 requests | 1 minute | Lower cost operations |
+
+### Smart Rate Limiting
+
+The system implements intelligent key generation:
+
+- **For authenticated users:** Limits are applied per `userId` (fair per-user limiting)
+- **For unauthenticated users:** Limits are applied per IP address (fallback)
+
+This ensures authenticated users aren't penalized by other users on the same network.
+
+### Rate Limit Response
+
+When a rate limit is exceeded, the API returns:
+
+```json
+{
+  "success": false,
+  "message": "Too many requests. Please try again later."
+}
+```
+
+HTTP Status: `429 (Too Many Requests)`
+
+### Headers
+
+Rate limit information is included in response headers:
+
+```
+RateLimit-Limit: 100
+RateLimit-Remaining: 42
+RateLimit-Reset: 1640995200
+```
+
+### Customizing Rate Limits
+
+To adjust rate limits for your deployment:
+
+1. Edit `src/middleware/rateLimiter/limiterPresets.js`
+2. Modify the `windowMs` (time window in milliseconds) and `max` (request count) values
+3. Restart the server
+
+Example: To change auth limit from 5 to 10 requests per 2 minutes:
+
+```javascript
+auth: {
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 10,
+  // ... rest of config
+}
+```
+
+## �📸 Screenshots
 *(Coming Soon - Add snapshots of your Dashboard, Graph Canvas, and Deep Focus Chat here)*
