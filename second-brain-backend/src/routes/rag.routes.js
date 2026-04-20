@@ -6,9 +6,8 @@ import { aiLimiter } from "../middleware/rateLimiter/rateLimiter.js"
 const ragRouter = Router()
 
 /**
- * @route POST /api/rag/query
- * @description Deep Focus chat endpoint. The frontend posts a question here and receives a grounded answer plus cited source chunks.
- * @access Private
+ * Deep Focus chat endpoint. 
+ * Allows users to ask questions about their archived content and receive AI-grounded answers with citations.
  */
 ragRouter.post("/rag/query", aiLimiter, AuthMiddleware, ragQueryController)
 

@@ -6,9 +6,8 @@ import { resurfacingLimiter } from "../middleware/rateLimiter/rateLimiter.js"
 const resurfacingRouter = Router()
 
 /**
- * @route GET /api/resurfacing/
- * @description Time-based memory resurfacing endpoint for the authenticated user's library.
- * @access Private
+ * Memory resurfacing endpoint.
+ * Randomly retrieves archived items from the user's past to encourage review and reinforcement of knowledge.
  */
 resurfacingRouter.get("/", resurfacingLimiter, AuthMiddleware, getResurfacedController)
 

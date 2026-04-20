@@ -57,10 +57,7 @@ uploadForm.addEventListener('submit', handleUploadSubmit);
 fileInput.addEventListener('change', handleFileInputChange);
 
 /**
- * Initializes the popup by checking the session state and loading the active tab preview.
- * 
- * @async
- * @returns {Promise<void>}
+ * Starts the extension by verifying the user's session and preparing the active tab for capture.
  */
 async function initializePopup() {
   updateUploadPreview(null);
@@ -104,10 +101,8 @@ async function initializePopup() {
 }
 
 /**
- * Handles the click event on the session action button (e.g., login, dashboard, retry).
- * 
- * @async
- * @returns {Promise<void>}
+ * Primary navigation controller for the extension header.
+ * Redirects to the dashboard if logged in, or the login page if the session is expired.
  */
 async function handleSessionActionClick() {
   if (popupSessionState.ready) {
@@ -137,10 +132,7 @@ async function handleSessionActionClick() {
 }
 
 /**
- * Handles the click event on the "Save Current Page" button.
- * 
- * @async
- * @returns {Promise<void>}
+ * Scrapes the current browser tab and sends its URL/metadata to the backend for archiving.
  */
 async function handleSaveCurrentPageClick() {
   await runPopupAction({
@@ -167,11 +159,7 @@ async function handleSaveCurrentPageClick() {
 }
 
 /**
- * Handles the submission of the "Save Link" form.
- * 
- * @async
- * @param {Event} event - The form submission event.
- * @returns {Promise<void>}
+ * Triggers a manual URL archival for links pasted into the extension input field.
  */
 async function handleSaveLinkSubmit(event) {
   event.preventDefault();
@@ -211,11 +199,7 @@ async function handleSaveLinkSubmit(event) {
 }
 
 /**
- * Handles the submission of the "Upload File" form.
- * 
- * @async
- * @param {Event} event - The form submission event.
- * @returns {Promise<void>}
+ * Uploads a local file (PDF/Image) directly to the Second Brain library.
  */
 async function handleUploadSubmit(event) {
   event.preventDefault();
@@ -386,12 +370,8 @@ async function ensureAuthenticatedSession() {
 }
 
 /**
- * Refreshes the session state by checking the authentication cookie.
- * 
- * @async
- * @param {Object} [options] - Refresh options.
- * @param {boolean} [options.preserveStatus=false] - Whether to skip showing the loading status.
- * @returns {Promise<Object>} The updated session state.
+ * Updates the internal session state by synchronizing with the authentication cookie
+ * and refreshing the UI panel.
  */
 async function refreshSessionState({ preserveStatus = false } = {}) {
   if (!preserveStatus) {

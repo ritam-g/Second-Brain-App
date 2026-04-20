@@ -19,12 +19,8 @@ const minimumIndexableCharacters = 20
 const maxContentEmbeddingBodyCharacters = 3600
 
 /**
- * Saves URL-based content by scraping metadata from the target page.
- * 
- * @async
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @returns {Promise<void>}
+ * Archives a URL by scraping its metadata and generating semantic embeddings.
+ * Triggers AI tagging, text chunking, and stores vectors in Pinecone for RAG support.
  */
 export async function saveContentController(req, res) {
     // Store vector IDs so we can rollback if something fails later
@@ -226,12 +222,8 @@ export async function saveContentController(req, res) {
 }
 
 /**
- * Uploads a PDF or image, extracts text, generates embeddings, stores vectors, uploads the file, and saves Mongo metadata.
- * 
- * @async
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @returns {Promise<void>}
+ * Processes a file upload (PDF or image) into the user's knowledge base.
+ * Extracts text via OCR, generates AI metadata/tags, and indexes chunks in Pinecone.
  */
 export async function uploadContentController(req, res) {
     // Keep track of stored vector ids so we can clean them up if a later step fails.
@@ -403,13 +395,8 @@ export async function uploadContentController(req, res) {
 }
 
 /**
- * Fetches all saved content for the authenticated user.
- * 
- * @async
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Retrieves all archived content for the current user, sorted by newest first.
+ * Sanitizes documents to remove internal fields like embeddings and raw vector IDs.
  */
 export async function getContentAllController(req, res, next) {
     try {
@@ -425,13 +412,8 @@ export async function getContentAllController(req, res, next) {
 }
 
 /**
- * Deletes one content record owned by the authenticated user.
- * 
- * @async
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Removes a specific content item and cleans up its external artifacts.
+ * Deletes associated vectors from Pinecone and files from ImageKit.
  */
 export async function DeleteContentController(req, res, next) {
     try {
@@ -459,13 +441,7 @@ export async function DeleteContentController(req, res, next) {
 }
 
 /**
- * Deletes every saved item for the authenticated user and clears related vectors/uploaded files.
- * 
- * @async
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Wipes the user's entire archive, including all database records, vectors, and files.
  */
 export async function clearAllContentController(req, res, next) {
     try {

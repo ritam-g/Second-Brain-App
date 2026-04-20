@@ -4,13 +4,8 @@ import { ArrowRight, Play, Rocket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
- * LandingHero component.
- * Displays the hero section of the landing page with a catchy title, description, and calls to action.
- * 
- * @component
- * @param {Object} props - Component props.
- * @param {string} props.graphImage - URL of the graph visualization image to display.
- * @returns {React.ReactElement} The rendered LandingHero component.
+ * The Hero section of the landing page.
+ * Features a high-energy call-to-action, product value proposition, and a visual graph representation.
  */
 const LandingHero = ({ graphImage }) => {
   return (

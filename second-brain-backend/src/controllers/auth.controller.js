@@ -16,12 +16,9 @@ const cookieOptions = {
 }
 
 /**
- * Handles user registration.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Creates a new user account.
+ * Validates required fields, password length, and handles duplicate email errors.
+ * Serializes the user data before returning it in the response.
  */
 export async function registerController(req, res, next) {
     try {
@@ -68,12 +65,8 @@ export async function registerController(req, res, next) {
 
 // login route 
 /**
- * Handles user login.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Authenticates a user and issues a JWT token via a secure cookie.
+ * Compares passwords, generates a session token, and returns the serialized user.
  */
 export async function userLoginController(req, res, next) {
     try {
@@ -110,12 +103,8 @@ export async function userLoginController(req, res, next) {
     }
 }
 /**
- * Checks the authentication status of a user.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Verifies the current session and returns the authenticated user's data.
+ * Used by the frontend to maintain persistent login state.
  */
 export async function checkAuthController(req, res, next) {
     try {
@@ -135,12 +124,8 @@ export async function checkAuthController(req, res, next) {
     }
 }
 /**
- * Updates the user's profile information.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Updates the authenticated user's display name and avatar URL.
+ * Normalizes the avatar URL and ensures the username is provided.
  */
 export async function updateProfileController(req, res, next) {
     try {
@@ -184,12 +169,8 @@ export async function updateProfileController(req, res, next) {
 }
 
 /**
- * Changes the user's password.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Replaces the user's existing password with a new one.
+ * Requires the current password for verification and enforces strength requirements.
  */
 export async function changePasswordController(req, res, next) {
     try {
@@ -252,12 +233,8 @@ export async function changePasswordController(req, res, next) {
 }
 
 /**
- * Deletes the user's account and associated content.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Permanently deletes a user's account and all their archived content.
+ * Clears the session cookie and triggers a cleanup of stored files and vectors.
  */
 export async function deleteAccountController(req, res, next) {
     try {
@@ -288,12 +265,7 @@ export async function deleteAccountController(req, res, next) {
 }
 
 /**
- * Logs out the user by clearing the authentication cookie.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
- * @returns {Promise<void>}
+ * Ends the user's session by clearing the authentication cookie.
  */
 export async function logoutController(req, res, next) {
     try {

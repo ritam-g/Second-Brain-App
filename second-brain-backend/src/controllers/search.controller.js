@@ -1,12 +1,8 @@
 import { normalizeRetrievalTopK, retrieveRelevantChunks } from "../services/retrieval.service.js"
 
 /**
- * Handles semantic search requests.
- * Converts a semantic query into Pinecone chunk matches and returns chunk-level metadata.
- * 
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @returns {Promise<void>}
+ * Executes a semantic similarity search against the user's vector archive.
+ * Returns relevant text chunks with metadata for high-precision retrieval.
  */
 export async function semanticSearchController(req, res) {
     try {
