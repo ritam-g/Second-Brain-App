@@ -15,6 +15,14 @@ const cookieOptions = {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
 }
 
+/**
+ * Handles user registration.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function registerController(req, res, next) {
     try {
         const username = String(req.body?.username || "").trim()
@@ -59,7 +67,14 @@ export async function registerController(req, res, next) {
 }
 
 // login route 
-
+/**
+ * Handles user login.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function userLoginController(req, res, next) {
     try {
         const email = normalizeEmail(req.body?.email)
@@ -94,7 +109,14 @@ export async function userLoginController(req, res, next) {
         })
     }
 }
-
+/**
+ * Checks the authentication status of a user.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function checkAuthController(req, res, next) {
     try {
         return res.status(200).json({
@@ -112,7 +134,14 @@ export async function checkAuthController(req, res, next) {
         })
     }
 }
-
+/**
+ * Updates the user's profile information.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function updateProfileController(req, res, next) {
     try {
         const username = String(req.body?.username || "").trim()
@@ -154,6 +183,14 @@ export async function updateProfileController(req, res, next) {
     }
 }
 
+/**
+ * Changes the user's password.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function changePasswordController(req, res, next) {
     try {
         const currentPassword = String(req.body?.currentPassword || "")
@@ -214,6 +251,14 @@ export async function changePasswordController(req, res, next) {
     }
 }
 
+/**
+ * Deletes the user's account and associated content.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function deleteAccountController(req, res, next) {
     try {
         const user = await userModel.findById(req.user.id)
@@ -242,6 +287,14 @@ export async function deleteAccountController(req, res, next) {
     }
 }
 
+/**
+ * Logs out the user by clearing the authentication cookie.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function logoutController(req, res, next) {
     try {
         res.clearCookie("jwtToken", cookieOptions);
@@ -258,10 +311,23 @@ export async function logoutController(req, res, next) {
     }
 }
 
+/**
+ * Normalizes an email address by trimming and converting to lowercase.
+ * 
+ * @param {string} value - The email address to normalize.
+ * @returns {string} The normalized email address.
+ */
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase()
 }
 
+/**
+ * Normalizes and validates an avatar URL.
+ * 
+ * @param {string} value - The avatar URL to normalize.
+ * @returns {string} The normalized avatar URL.
+ * @throws {Error} If the URL is invalid or uses an unsupported protocol.
+ */
 function normalizeAvatarUrl(value) {
     const normalizedValue = String(value || "").trim()
 
@@ -282,6 +348,12 @@ function normalizeAvatarUrl(value) {
     }
 }
 
+/**
+ * Checks if an error is a duplicate email error from MongoDB.
+ * 
+ * @param {Error} error - The error object to check.
+ * @returns {boolean} True if it's a duplicate email error, false otherwise.
+ */
 function isDuplicateEmailError(error) {
     return Number(error?.code) === 11000 && String(error?.message || "").includes("email")
 }

@@ -56,6 +56,12 @@ linkForm.addEventListener('submit', handleSaveLinkSubmit);
 uploadForm.addEventListener('submit', handleUploadSubmit);
 fileInput.addEventListener('change', handleFileInputChange);
 
+/**
+ * Initializes the popup by checking the session state and loading the active tab preview.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function initializePopup() {
   updateUploadPreview(null);
 
@@ -97,6 +103,12 @@ async function initializePopup() {
   }
 }
 
+/**
+ * Handles the click event on the session action button (e.g., login, dashboard, retry).
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function handleSessionActionClick() {
   if (popupSessionState.ready) {
     const session = await getStoredSession();
@@ -124,6 +136,12 @@ async function handleSessionActionClick() {
   await openOrFocusFrontendPage(resolveFrontendBaseUrl(session.apiBaseUrl), LOGIN_ROUTE);
 }
 
+/**
+ * Handles the click event on the "Save Current Page" button.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function handleSaveCurrentPageClick() {
   await runPopupAction({
     actionButton: saveCurrentPageButton,
@@ -148,6 +166,13 @@ async function handleSaveCurrentPageClick() {
   });
 }
 
+/**
+ * Handles the submission of the "Save Link" form.
+ * 
+ * @async
+ * @param {Event} event - The form submission event.
+ * @returns {Promise<void>}
+ */
 async function handleSaveLinkSubmit(event) {
   event.preventDefault();
 
@@ -185,6 +210,13 @@ async function handleSaveLinkSubmit(event) {
   });
 }
 
+/**
+ * Handles the submission of the "Upload File" form.
+ * 
+ * @async
+ * @param {Event} event - The form submission event.
+ * @returns {Promise<void>}
+ */
 async function handleUploadSubmit(event) {
   event.preventDefault();
 
@@ -228,6 +260,12 @@ async function handleUploadSubmit(event) {
   });
 }
 
+/**
+ * Handles changes to the file input (e.g., when a file is selected).
+ * 
+ * @param {Event} event - The input change event.
+ * @returns {void}
+ */
 function handleFileInputChange(event) {
   const selectedFile = event.target.files?.[0] || null;
 
@@ -245,6 +283,19 @@ function handleFileInputChange(event) {
   }
 }
 
+/**
+ * Helper function to run an asynchronous action from the popup, managing loading state and errors.
+ * 
+ * @async
+ * @param {Object} options - Action options.
+ * @param {HTMLElement} options.actionButton - The button that triggered the action.
+ * @param {string} options.loadingLabel - The label to show on the button while loading.
+ * @param {string} options.loadingStatus - The status message to show while loading.
+ * @param {string} options.successStatus - The status message to show on success.
+ * @param {Function} options.work - The asynchronous function containing the actual work.
+ * @param {Function} [options.afterSuccess] - An optional function to run after a successful action.
+ * @returns {Promise<void>}
+ */
 async function runPopupAction({
   actionButton,
   loadingLabel,
@@ -299,6 +350,12 @@ async function runPopupAction({
   }
 }
 
+/**
+ * Ensures that an authenticated session exists, refreshing it if necessary.
+ * 
+ * @async
+ * @returns {Promise<Object|null>} The session object if authenticated, or null otherwise.
+ */
 async function ensureAuthenticatedSession() {
   await initializationPromise;
 
@@ -328,6 +385,14 @@ async function ensureAuthenticatedSession() {
   return null;
 }
 
+/**
+ * Refreshes the session state by checking the authentication cookie.
+ * 
+ * @async
+ * @param {Object} [options] - Refresh options.
+ * @param {boolean} [options.preserveStatus=false] - Whether to skip showing the loading status.
+ * @returns {Promise<Object>} The updated session state.
+ */
 async function refreshSessionState({ preserveStatus = false } = {}) {
   if (!preserveStatus) {
     updateSessionPanel({

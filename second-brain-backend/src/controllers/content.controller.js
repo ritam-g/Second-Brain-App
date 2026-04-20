@@ -18,9 +18,14 @@ import {
 const minimumIndexableCharacters = 20
 const maxContentEmbeddingBodyCharacters = 3600
 
-// Saves URL-based content by scraping metadata from the target page.
-// Input: Express request with `req.body.url`, optional `req.body.title`, and authenticated `req.user.id`.
-// Output: JSON response containing the created content document.
+/**
+ * Saves URL-based content by scraping metadata from the target page.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
 export async function saveContentController(req, res) {
     // Store vector IDs so we can rollback if something fails later
     let vectorIds = []
@@ -220,9 +225,14 @@ export async function saveContentController(req, res) {
     }
 }
 
-// Uploads a PDF or image, extracts text, generates embeddings, stores vectors, uploads the file, and saves Mongo metadata.
-// Input: Express request with `req.file` from multer, optional `req.body.title`, and authenticated `req.user.id`.
-// Output: JSON response containing the created content document.
+/**
+ * Uploads a PDF or image, extracts text, generates embeddings, stores vectors, uploads the file, and saves Mongo metadata.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
 export async function uploadContentController(req, res) {
     // Keep track of stored vector ids so we can clean them up if a later step fails.
     let vectorIds = []
@@ -392,9 +402,15 @@ export async function uploadContentController(req, res) {
     }
 }
 
-// Fetches all saved content for the authenticated user.
-// Input: Express request with authenticated `req.user.id`.
-// Output: JSON response containing an array of content documents.
+/**
+ * Fetches all saved content for the authenticated user.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function getContentAllController(req, res, next) {
     try {
         const contents = await contentModel.find({ userId: String(req.user.id) }).sort({ createdAt: -1 })
@@ -408,9 +424,15 @@ export async function getContentAllController(req, res, next) {
     }
 }
 
-// Deletes one content record owned by the authenticated user.
-// Input: Express request with `req.params.id` and authenticated `req.user.id`.
-// Output: JSON response containing the deleted document when successful.
+/**
+ * Deletes one content record owned by the authenticated user.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function DeleteContentController(req, res, next) {
     try {
         const contentId = req.params.id
@@ -436,9 +458,15 @@ export async function DeleteContentController(req, res, next) {
     }
 }
 
-// Deletes every saved item for the authenticated user and clears related vectors/uploaded files.
-// Input: Express request with authenticated `req.user.id`.
-// Output: JSON response containing the deleted item count.
+/**
+ * Deletes every saved item for the authenticated user and clears related vectors/uploaded files.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function clearAllContentController(req, res, next) {
     try {
         const result = await clearUserContentByUserId(String(req.user.id))
@@ -461,9 +489,15 @@ export async function clearAllContentController(req, res, next) {
     }
 }
 
-// Fetches the current user's saved content without applying extra filters.
-// Input: Express request with authenticated `req.user.id`.
-// Output: JSON response containing an array of saved content documents.
+/**
+ * Fetches the current user's saved content without applying extra filters.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @param {import('express').NextFunction} next - Express next function.
+ * @returns {Promise<void>}
+ */
 export async function getSingleUserContentController(req, res, next) {
     try {
         const id = String(req.user.id)
@@ -481,9 +515,14 @@ export async function getSingleUserContentController(req, res, next) {
     }
 }
 
-// Proxies third-party preview images through the backend so blocked hotlinks still render on the frontend.
-// Input: Express request with `req.query.url` and optional `req.query.source`.
-// Output: proxied image bytes or a JSON error response.
+/**
+ * Proxies third-party preview images through the backend so blocked hotlinks still render on the frontend.
+ * 
+ * @async
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
 export async function proxyContentImageController(req, res) {
     try {
         const imageUrl = String(req.query.url || "").trim()
@@ -569,9 +608,13 @@ export async function proxyContentImageController(req, res) {
     }
 }
 
-// Resolves a safe referer header for the image proxy fetch request.
-// Input: original source page URL and parsed image URL.
-// Output: referer string used in the outbound fetch.
+/**
+ * Resolves a safe referer header for the image proxy fetch request.
+ * 
+ * @param {string} sourceUrl - The original source page URL.
+ * @param {URL} parsedImageUrl - The parsed image URL.
+ * @returns {string} The referer string used in the outbound fetch.
+ */
 function getSafeReferer(sourceUrl, parsedImageUrl) {
     try {
         if (sourceUrl) {
@@ -588,9 +631,12 @@ function getSafeReferer(sourceUrl, parsedImageUrl) {
     return parsedImageUrl.origin + "/"
 }
 
-// Prevents the proxy endpoint from being used against localhost or private-network destinations.
-// Input: hostname string from the requested image URL.
-// Output: boolean indicating whether the host should be blocked.
+/**
+ * Prevents the proxy endpoint from being used against localhost or private-network destinations.
+ * 
+ * @param {string} hostname - Hostname string from the requested image URL.
+ * @returns {boolean} True if the host should be blocked, false otherwise.
+ */
 function isBlockedProxyHost(hostname) {
     const normalizedHost = String(hostname || "").toLowerCase()
 
@@ -617,9 +663,12 @@ function isBlockedProxyHost(hostname) {
     return false
 }
 
-// Maps known upload failures to a response status that matches the root cause.
-// Input: thrown error from upload/extract/AI services.
-// Output: HTTP status code for the API response.
+/**
+ * Maps known upload failures to a response status that matches the root cause.
+ * 
+ * @param {Error} error - The thrown error from upload/extract/AI services.
+ * @returns {number} HTTP status code for the API response.
+ */
 function resolveUploadErrorStatus(error) {
     const message = String(error?.message || "")
 
@@ -635,9 +684,13 @@ function resolveUploadErrorStatus(error) {
     return 500
 }
 
-// Converts low-level content mutation errors into readable API messages for the frontend or API client.
-// Input: thrown error from upload/save/vector services plus a fallback message.
-// Output: safe response message string.
+/**
+ * Converts low-level content mutation errors into readable API messages.
+ * 
+ * @param {Error} error - The thrown error from upload/save/vector services.
+ * @param {string} fallbackMessage - A fallback message if the error is unknown.
+ * @returns {string} Safe response message string.
+ */
 function resolveContentMutationErrorMessage(error, fallbackMessage) {
     const message = String(error?.message || "")
 
@@ -664,9 +717,12 @@ function resolveContentMutationErrorMessage(error, fallbackMessage) {
     return fallbackMessage
 }
 
-// Normalizes extracted text before validation and chunking.
-// Input: raw OCR/PDF text.
-// Output: cleaned text string.
+/**
+ * Normalizes extracted text before validation and chunking.
+ * 
+ * @param {string} text - Raw OCR/PDF text.
+ * @returns {string} Cleaned text string.
+ */
 function normalizeExtractedText(text) {
     return String(text || "")
         .replace(/\u0000/g, " ")
@@ -676,17 +732,29 @@ function normalizeExtractedText(text) {
         .trim()
 }
 
-// Determines whether extracted text is substantial enough to embed and index.
-// Input: normalized extracted text.
-// Output: boolean indicating whether vectorization should proceed.
+/**
+ * Determines whether extracted text is substantial enough to embed and index.
+ * 
+ * @param {string} text - Normalized extracted text.
+ * @returns {boolean} True if vectorization should proceed, false otherwise.
+ */
 function hasIndexableText(text) {
     const normalizedText = normalizeExtractedText(text)
     return normalizedText.length >= minimumIndexableCharacters
 }
 
-// Builds a compact retrieval text block for saved URLs so links can also be embedded and searched.
-// Input: normalized metadata for a saved URL.
-// Output: one chunkable text string for vector indexing.
+/**
+ * Builds a compact retrieval text block for saved URLs so links can also be embedded and searched.
+ * 
+ * @param {Object} options - Metadata options.
+ * @param {string} options.title - Page title.
+ * @param {string} options.description - Page description.
+ * @param {string[]} options.tags - Array of tags.
+ * @param {string} options.type - Content type.
+ * @param {string} options.url - Source URL.
+ * @param {string} [options.bodyText=""] - Optional body text.
+ * @returns {string} One chunkable text string for vector indexing.
+ */
 function buildSavedContentIndexText({ title, description, tags, type, url, bodyText = "" }) {
     return normalizeExtractedText([
         title ? `Title: ${title}` : "",
@@ -698,9 +766,18 @@ function buildSavedContentIndexText({ title, description, tags, type, url, bodyT
     ].filter(Boolean).join("\n"))
 }
 
-// Builds a bounded content-level embedding payload so large transcripts and PDFs stay graph-searchable without exceeding model limits.
-// Input: normalized content metadata plus optional long body text.
-// Output: compact text string safe for one content-level embedding request.
+/**
+ * Builds a bounded content-level embedding payload so large transcripts and PDFs stay graph-searchable.
+ * 
+ * @param {Object} options - Metadata options.
+ * @param {string} options.title - Content title.
+ * @param {string} options.description - Content description.
+ * @param {string[]} options.tags - Array of tags.
+ * @param {string} options.type - Content type.
+ * @param {string} options.url - Content URL.
+ * @param {string} [options.bodyText=""] - Optional long body text.
+ * @returns {string} Compact text string safe for one content-level embedding request.
+ */
 function buildContentEmbeddingText({ title, description, tags, type, url, bodyText = "" }) {
     const normalizedBodyText = normalizeExtractedText(bodyText).slice(0, maxContentEmbeddingBodyCharacters)
 
@@ -714,9 +791,13 @@ function buildContentEmbeddingText({ title, description, tags, type, url, bodyTe
     ].filter(Boolean).join("\n"))
 }
 
-// Prefers structured AI tags but falls back to the existing metadata tag pipeline when needed.
-// Input: structured tag array and the upload-metadata fallback tags.
-// Output: deduplicated tag array safe to save in MongoDB.
+/**
+ * Prefers structured AI tags but falls back to the existing metadata tag pipeline when needed.
+ * 
+ * @param {string[]} structuredTags - Structured tag array from AI.
+ * @param {string[]} fallbackTags - Fallback tags from metadata.
+ * @returns {string[]} Deduplicated and normalized tag array.
+ */
 function resolveUploadTags(structuredTags, fallbackTags) {
     const normalizedTags = [
         ...(Array.isArray(structuredTags) ? structuredTags : []),
@@ -728,9 +809,12 @@ function resolveUploadTags(structuredTags, fallbackTags) {
     return [...new Set(normalizedTags)].slice(0, 10)
 }
 
-// Removes internal-only fields before newly created content documents are returned to the client.
-// Input: Mongoose document or plain object.
-// Output: plain content object safe for API responses.
+/**
+ * Removes internal-only fields before returning content documents to the client.
+ * 
+ * @param {Object} content - Mongoose document or plain object.
+ * @returns {Object} Plain content object safe for API responses.
+ */
 function sanitizeContentDocument(content) {
     const normalizedContent = typeof content?.toObject === "function"
         ? content.toObject()
@@ -743,9 +827,16 @@ function sanitizeContentDocument(content) {
     return normalizedContent
 }
 
-// Finds an existing saved URL for the same user using both raw and normalized URL forms.
-// Input: authenticated user id plus raw and normalized URL candidates.
-// Output: matching content document or null.
+/**
+ * Finds an existing saved URL for the same user using both raw and normalized URL forms.
+ * 
+ * @async
+ * @param {Object} options - Search options.
+ * @param {string} options.userId - Authenticated user id.
+ * @param {string} options.rawUrl - Raw URL string.
+ * @param {string} options.normalizedUrl - Normalized URL candidate.
+ * @returns {Promise<Object|null>} Matching content document or null.
+ */
 async function findExistingUrlContent({ userId, rawUrl, normalizedUrl }) {
     const candidates = [rawUrl, normalizedUrl]
         .map(value => String(value || "").trim())
@@ -765,9 +856,15 @@ async function findExistingUrlContent({ userId, rawUrl, normalizedUrl }) {
     }).sort({ createdAt: -1 })
 }
 
-// Finds an existing uploaded file for the same user using the computed file hash.
-// Input: authenticated user id and SHA-256 file hash string.
-// Output: matching content document or null.
+/**
+ * Finds an existing uploaded file for the same user using the computed file hash.
+ * 
+ * @async
+ * @param {Object} options - Search options.
+ * @param {string} options.userId - Authenticated user id.
+ * @param {string} options.fileHash - SHA-256 file hash string.
+ * @returns {Promise<Object|null>} Matching content document or null.
+ */
 async function findExistingUploadedContent({ userId, fileHash }) {
     const normalizedFileHash = String(fileHash || "").trim()
 
@@ -781,9 +878,15 @@ async function findExistingUploadedContent({ userId, fileHash }) {
     }).sort({ createdAt: -1 })
 }
 
-// Returns a successful duplicate response so the UI can show when the original save happened.
-// Input: Express response plus the matching content document and fallback message.
-// Output: duplicate-aware JSON response.
+/**
+ * Returns a successful duplicate response so the UI can show when the original save happened.
+ * 
+ * @param {import('express').Response} res - Express response object.
+ * @param {Object} options - Response options.
+ * @param {Object} options.content - Matching content document.
+ * @param {string} options.fallbackMessage - Fallback message string.
+ * @returns {Object} JSON response.
+ */
 function respondWithDuplicateContent(res, { content, fallbackMessage }) {
     return res.status(200).json({
         success: true,
@@ -793,9 +896,13 @@ function respondWithDuplicateContent(res, { content, fallbackMessage }) {
     })
 }
 
-// Formats a duplicate-save message that includes the original saved date when available.
-// Input: existing content document and fallback message string.
-// Output: user-facing duplicate message.
+/**
+ * Formats a duplicate-save message that includes the original saved date.
+ * 
+ * @param {Object} content - Existing content document.
+ * @param {string} fallbackMessage - Fallback message string.
+ * @returns {string} User-facing duplicate message.
+ */
 function buildDuplicateContentMessage(content, fallbackMessage) {
     const savedDateLabel = formatSavedDate(content?.createdAt)
     return savedDateLabel ? `You already saved this on ${savedDateLabel}.` : fallbackMessage

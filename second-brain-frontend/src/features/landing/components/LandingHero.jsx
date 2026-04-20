@@ -3,6 +3,15 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Play, Rocket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+/**
+ * LandingHero component.
+ * Displays the hero section of the landing page with a catchy title, description, and calls to action.
+ * 
+ * @component
+ * @param {Object} props - Component props.
+ * @param {string} props.graphImage - URL of the graph visualization image to display.
+ * @returns {React.ReactElement} The rendered LandingHero component.
+ */
 const LandingHero = ({ graphImage }) => {
   return (
     <section className="relative min-h-[140vh] md:min-h-[160vh] flex flex-col items-center pt-32 md:pt-48 overflow-hidden">

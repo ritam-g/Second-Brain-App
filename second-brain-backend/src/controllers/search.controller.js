@@ -1,8 +1,13 @@
 import { normalizeRetrievalTopK, retrieveRelevantChunks } from "../services/retrieval.service.js"
 
-// Converts a semantic query into Pinecone chunk matches and returns chunk-level metadata.
-// Input: request body with `query` and optional `topK`, plus authenticated `req.user.id`.
-// Output: ordered semantic chunk matches with metadata ready for the frontend search UI.
+/**
+ * Handles semantic search requests.
+ * Converts a semantic query into Pinecone chunk matches and returns chunk-level metadata.
+ * 
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
 export async function semanticSearchController(req, res) {
     try {
         const query = String(req.body?.query || "").trim()
@@ -43,9 +48,13 @@ export async function semanticSearchController(req, res) {
 // Backward-compatible export for any existing imports using the old controller name.
 export const semanticSearch = semanticSearchController
 
-// Converts low-level vector/embedding failures into safer API messages.
-// Input: thrown search error.
-// Output: response message string.
+/**
+ * Resolves search errors into user-friendly messages.
+ * Converts low-level vector/embedding failures into safer API messages.
+ * 
+ * @param {Error} error - The error object to resolve.
+ * @returns {string} User-friendly error message.
+ */
 function resolveSearchErrorMessage(error) {
     const message = String(error?.message || "")
 
