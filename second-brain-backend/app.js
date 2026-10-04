@@ -31,7 +31,12 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 
-
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Server is up'
+    })
+})
 app.use('/api/content', contentRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/graph', graphRouter)
