@@ -191,4 +191,4 @@ auth: {
 ```
 
 ## �📸 Screenshots
-*(Coming Soon - Add snapshots of your Dashboard, Graph Canvas, and Deep Focus Chat here)*
+*(Coming Soon)*
